@@ -10,10 +10,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const user = await userFromRequest(req);
     const body = await req.json();
     const db = supabaseAdmin();
-    const { data: list } = await db.from("wish_lists").select("owner_key_hash,owner_user_id").eq("id", id).single();
-    const ownerKeyMatches = Boolean(key) && Boolean(list) && hashKey(key) === list.owner_key_hash;
-    const accountMatches = Boolean(user && list?.owner_user_id === user.id);
-    if (!list || (!ownerKeyMatches && !accountMatches)) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+    const { data: list, error: listError } = await db.from("wish_lists").select("owner_key_hash,owner_user_id").eq("id", id).single();
+    if (listError || !list) return NextResponse.json({ error: "List not found." }, { status: 404 });
+
+    const ownerKeyMatches = Boolean(key) && hashKey(key) === list.owner_key_hash;
+    const accountMatches = Boolean(user && list.owner_user_id === user.id);
+    if (!ownerKeyMatches && !accountMatches) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
 
     const title = String(body.title || "").trim();
     if (!title) return NextResponse.json({ error: "Item name is required." }, { status: 400 });

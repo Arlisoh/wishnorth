@@ -9,10 +9,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const key = req.headers.get("x-owner-key") || "";
     const user = await userFromRequest(req);
     const db = supabaseAdmin();
-    const { data: list } = await db.from("wish_lists").select("owner_key_hash,owner_user_id").eq("id", id).single();
-    const ownerKeyMatches = Boolean(key) && Boolean(list) && hashKey(key) === list.owner_key_hash;
-    const accountMatches = Boolean(user && list?.owner_user_id === user.id);
-    if (!list || (!ownerKeyMatches && !accountMatches)) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+    const { data: list, error: listError } = await db.from("wish_lists").select("owner_key_hash,owner_user_id").eq("id", id).single();
+    if (listError || !list) return NextResponse.json({ error: "List not found." }, { status: 404 });
+
+    const ownerKeyMatches = Boolean(key) && hashKey(key) === list.owner_key_hash;
+    const accountMatches = Boolean(user && list.owner_user_id === user.id);
+    if (!ownerKeyMatches && !accountMatches) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
 
     const { data: item } = await db.from("wish_items").select("id").eq("id", itemId).eq("list_id", id).single();
     if (!item) return NextResponse.json({ error: "Wish not found." }, { status: 404 });

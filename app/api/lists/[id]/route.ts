@@ -15,9 +15,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       .eq("id", id)
       .single();
 
-    const ownerKeyMatches = Boolean(key) && Boolean(list) && hashKey(key) === list.owner_key_hash;
-    const accountMatches = Boolean(user && list?.owner_user_id === user.id);
-    if (error || !list || (!ownerKeyMatches && !accountMatches)) {
+    if (error || !list) {
+      return NextResponse.json({ error: "List not found." }, { status: 404 });
+    }
+
+    const ownerKeyMatches = Boolean(key) && hashKey(key) === list.owner_key_hash;
+    const accountMatches = Boolean(user && list.owner_user_id === user.id);
+    if (!ownerKeyMatches && !accountMatches) {
       return NextResponse.json({ error: "You do not have access to manage this list." }, { status: 403 });
     }
 
