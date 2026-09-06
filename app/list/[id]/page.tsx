@@ -1,6 +1,9 @@
 "use client";
 
 import { FormEvent, use, useEffect, useState } from "react";
+import Link from "next/link";
+import { authHeaders } from "@/lib/client-auth";
+import { supabaseBrowser } from "@/lib/supabase-browser";
 import Header from "@/components/Header";
 import ItemCard from "@/components/ItemCard";
 import type { WishList } from "@/lib/types";
@@ -13,9 +16,11 @@ export default function OwnerList({ params }: { params: Promise<{ id: string }> 
   const [error, setError] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
 
   async function load(key: string) {
-    const res = await fetch(`/api/lists/${id}`, { headers: { "x-owner-key": key } });
+    const headers = await authHeaders(key ? { "x-owner-key": key } : {});
+    const res = await fetch(`/api/lists/${id}`, { headers, cache: "no-store" });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Could not load list");
     setList(data.list);
@@ -24,19 +29,37 @@ export default function OwnerList({ params }: { params: Promise<{ id: string }> 
   useEffect(() => {
     const key = localStorage.getItem(`wishnorth_owner_${id}`) || "";
     setOwnerKey(key);
-    if (!key) {
-      setError("This browser does not have the private owner key for this list.");
-      setLoading(false);
-      return;
+    try {
+      const supabase = supabaseBrowser();
+      supabase.auth.getSession().then(({ data }) => setSignedIn(Boolean(data.session)));
+      const { data } = supabase.auth.onAuthStateChange((_e, session) => setSignedIn(Boolean(session)));
+      load(key).catch(e => setError(e.message)).finally(() => setLoading(false));
+      return () => data.subscription.unsubscribe();
+    } catch {
+      load(key).catch(e => setError(e.message)).finally(() => setLoading(false));
     }
-    load(key).catch(e => setError(e.message)).finally(() => setLoading(false));
   }, [id]);
+
+  async function deleteItem(itemId: string, title: string) {
+    if (!confirm(`Delete “${title}” from this list?`)) return;
+    setError("");
+    try {
+      const headers = await authHeaders(ownerKey ? { "x-owner-key": ownerKey } : {});
+      const res = await fetch(`/api/lists/${id}/items/${itemId}`, { method: "DELETE", headers });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not delete wish");
+      await load(ownerKey);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete wish");
+    }
+  }
 
   return <main><Header />
     <section className="owner-hero shell">
       {loading ? <div className="loading">Opening your list…</div> : error ? <div className="error-box">{error}</div> : list ? <>
         <div className="owner-title-row"><div><div className="eyebrow">{list.occasion.toUpperCase()} LIST</div><h1>{list.subject_name}’s wishes <span>✨</span></h1><p>{list.items.length} {list.items.length === 1 ? "wish" : "wishes"} so far</p></div><div className="owner-buttons"><button className="button button-ghost" onClick={() => setShowShare(true)}>Share list</button><button className="button button-primary" onClick={() => setShowAdd(true)}>+ Add a wish</button></div></div>
-        {list.items.length ? <div className="gift-grid">{list.items.map(item => <ItemCard key={item.id} item={item} />)}</div> : <div className="empty-list"><div>🎁</div><h2>The list is ready.</h2><p>Add the first wish from any store on the internet.</p><button className="button button-primary button-big" onClick={() => setShowAdd(true)}>Add the first wish</button></div>}
+        {!signedIn && ownerKey ? <div className="account-nudge"><div><strong>Keep this list on every device.</strong><span>Create a free Wish North account and this list will be attached automatically.</span></div><Link href="/account" className="button button-ghost">Save to account</Link></div> : null}
+        {list.items.length ? <div className="gift-grid">{list.items.map(item => <ItemCard key={item.id} item={item} onDelete={() => deleteItem(item.id, item.title)} />)}</div> : <div className="empty-list"><div>🎁</div><h2>The list is ready.</h2><p>Add the first wish from any store on the internet.</p><button className="button button-primary button-big" onClick={() => setShowAdd(true)}>Add the first wish</button></div>}
         {showAdd ? <AddWishModal listId={id} ownerKey={ownerKey} onClose={() => setShowAdd(false)} onAdded={async () => { await load(ownerKey); setShowAdd(false); }} /> : null}
         {showShare ? <ShareModal list={list} onClose={() => setShowShare(false)} /> : null}
       </> : null}
@@ -77,7 +100,8 @@ function AddWishModal({ listId, ownerKey, onClose, onAdded }: { listId: string; 
   async function save(e: FormEvent) {
     e.preventDefault(); setSaving(true); setError("");
     try {
-      const res = await fetch(`/api/lists/${listId}/items`, { method: "POST", headers: { "content-type": "application/json", "x-owner-key": ownerKey }, body: JSON.stringify({ url, title, retailer, imageUrl, price, size, color, notes, priority }) });
+      const headers = await authHeaders({ "content-type": "application/json", ...(ownerKey ? { "x-owner-key": ownerKey } : {}) });
+      const res = await fetch(`/api/lists/${listId}/items`, { method: "POST", headers, body: JSON.stringify({ url, title, retailer, imageUrl, price, size, color, notes, priority }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not save wish");
       onAdded();

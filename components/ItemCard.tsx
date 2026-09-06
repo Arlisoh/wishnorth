@@ -3,7 +3,12 @@
 import { money } from "@/lib/helpers";
 import type { WishItem } from "@/lib/types";
 
-export default function ItemCard({ item, publicView = false, onClaim }: { item: WishItem; publicView?: boolean; onClaim?: (item: WishItem) => void }) {
+export default function ItemCard({ item, publicView = false, onClaim, onDelete }: {
+  item: WishItem;
+  publicView?: boolean;
+  onClaim?: (item: WishItem) => void;
+  onDelete?: (item: WishItem) => void;
+}) {
   return (
     <article className={`gift-card ${item.claimed ? "gift-card-claimed" : ""}`}>
       <div className="gift-image-wrap">
@@ -24,6 +29,7 @@ export default function ItemCard({ item, publicView = false, onClaim }: { item: 
           {item.url ? <a href={item.url} target="_blank" rel="noreferrer" className="text-link">View item ↗</a> : null}
           {publicView && !item.claimed && onClaim ? <button className="button button-dark" onClick={() => onClaim(item)}>I’m getting this</button> : null}
           {publicView && item.claimed ? <span className="taken-copy">Someone has this covered ✨</span> : null}
+          {!publicView && onDelete ? <button className="plain-link danger-link" onClick={() => onDelete(item)}>Delete</button> : null}
         </div>
       </div>
     </article>

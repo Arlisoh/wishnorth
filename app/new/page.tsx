@@ -1,8 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
+import { authHeaders } from "@/lib/client-auth";
+import { supabaseBrowser } from "@/lib/supabase-browser";
 
 export default function NewList() {
   const router = useRouter();
@@ -11,12 +13,23 @@ export default function NewList() {
   const [managed, setManaged] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    try {
+      const supabase = supabaseBrowser();
+      supabase.auth.getSession().then(({ data }) => setSignedIn(Boolean(data.session)));
+      const { data } = supabase.auth.onAuthStateChange((_e, session) => setSignedIn(Boolean(session)));
+      return () => data.subscription.unsubscribe();
+    } catch { return; }
+  }, []);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setLoading(true); setError("");
     try {
-      const res = await fetch("/api/lists", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ subjectName, occasion, isManaged: managed }) });
+      const headers = await authHeaders({ "content-type": "application/json" });
+      const res = await fetch("/api/lists", { method: "POST", headers, body: JSON.stringify({ subjectName, occasion, isManaged: managed }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create list");
       localStorage.setItem(`wishnorth_owner_${data.id}`, data.ownerKey);
@@ -32,7 +45,7 @@ export default function NewList() {
       <section className="form-shell shell-narrow">
         <div className="eyebrow">START A LIST</div>
         <h1>Who are we wishing for?</h1>
-        <p className="form-intro">No account wall. Create the list first, then share it when you are ready.</p>
+        <p className="form-intro">{signedIn ? "This list will be saved to your Wish North account automatically." : "Create the list now. You can make a free account afterward to keep it available on every device."}</p>
         <form onSubmit={submit} className="big-form">
           <label><span>First name</span><input required maxLength={80} value={subjectName} onChange={e => setSubjectName(e.target.value)} placeholder="Carter" autoFocus /></label>
           <label><span>Occasion</span><select value={occasion} onChange={e => setOccasion(e.target.value)}><option>Christmas</option><option>Birthday</option><option>Graduation</option><option>Wedding</option><option>Other</option></select></label>
