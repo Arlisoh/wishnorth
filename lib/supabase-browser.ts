@@ -4,19 +4,19 @@ import { createClient } from "@supabase/supabase-js";
 
 let client: ReturnType<typeof createClient> | null = null;
 
+const SUPABASE_URL = "https://yhxwdiwrenpciomrspir.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_SAFvRF5OBpmWXW10urhSgg_oj6yRLpQ";
+
 export function supabaseBrowser() {
   if (client) return client;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !key) {
-    throw new Error("Wish North account sign-in is not configured yet.");
-  }
-  client = createClient(url, key, {
+
+  client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
     },
   });
+
   return client;
 }
