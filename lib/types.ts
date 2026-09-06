@@ -12,6 +12,13 @@ export type WishItem = {
   color: string | null;
   priority: number;
   created_at: string;
+  updated_at?: string;
+  image_source_url?: string | null;
+  normalized_url?: string | null;
+  normalized_title?: string | null;
+  retailer_domain?: string | null;
+  product_key?: string | null;
+  moderation_status?: string;
   claimed?: boolean;
 };
 

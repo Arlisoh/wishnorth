@@ -2,32 +2,5 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { hashKey, randomToken } from "@/lib/security";
 import { userFromRequest } from "@/lib/auth";
-
-export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
-  try {
-    const user = await userFromRequest(req);
-    const { token } = await params;
-    const body = await req.json();
-    const itemId = String(body.itemId || "");
-    const name = String(body.name || user?.user_metadata?.first_name || "").trim();
-    if (!itemId || !name) return NextResponse.json({ error: "Your first name is required." }, { status: 400 });
-    const db = supabaseAdmin();
-    const { data: list } = await db.from("wish_lists").select("id").eq("share_token", token).single();
-    if (!list) return NextResponse.json({ error: "Shared list not found." }, { status: 404 });
-    const { data: item } = await db.from("wish_items").select("id").eq("id", itemId).eq("list_id", list.id).single();
-    if (!item) return NextResponse.json({ error: "That gift is not on this list." }, { status: 400 });
-    const claimCode = randomToken(24);
-    const { error } = await db.from("gift_claims").insert({
-      item_id: itemId,
-      claimer_name: name.slice(0, 80),
-      claim_code_hash: hashKey(claimCode),
-      claimer_user_id: user?.id || null,
-    });
-    if (error?.code === "23505") return NextResponse.json({ error: "Someone else just claimed this gift." }, { status: 409 });
-    if (error) throw error;
-    return NextResponse.json({ ok: true, claimCode, savedToAccount: Boolean(user) });
-  } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: "Could not claim this gift." }, { status: 500 });
-  }
-}
+import { enforceRateLimit, rejectBot } from "@/lib/rateLimit";
+export async function POST(req:Request,{params}:{params:Promise<{token:string}>}){try{await enforceRateLimit(req,"claim-gift",30,3600);const user=await userFromRequest(req),{token}=await params,body=await req.json();rejectBot(body);const itemId=String(body.itemId||""),name=String(body.name||user?.user_metadata?.first_name||"").trim();if(!itemId||!name)return NextResponse.json({error:"Your first name is required."},{status:400});const db=supabaseAdmin();const{data:list}=await db.from("wish_lists").select("id,moderation_status").eq("share_token",token).single();if(!list||list.moderation_status!=="active")return NextResponse.json({error:"Shared list not found."},{status:404});const{data:item}=await db.from("wish_items").select("id,moderation_status").eq("id",itemId).eq("list_id",list.id).single();if(!item||item.moderation_status!=="active")return NextResponse.json({error:"That gift is not on this list."},{status:400});const claimCode=randomToken(24);const{error}=await db.from("gift_claims").insert({item_id:itemId,claimer_name:name.slice(0,80),claim_code_hash:hashKey(claimCode),claimer_user_id:user?.id||null});if(error?.code==="23505")return NextResponse.json({error:"Someone else just claimed this gift."},{status:409});if(error)throw error;return NextResponse.json({ok:true,claimCode,savedToAccount:Boolean(user)});}catch(e){const status=(e as Error&{status?:number}).status||500;return NextResponse.json({error:status===429?"Too many claim attempts. Please try again later.":"Could not claim this gift."},{status});}}

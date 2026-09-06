@@ -1,0 +1,4 @@
+import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/auth";
+import { supabaseAdmin } from "@/lib/supabase";
+export async function POST(req:Request){try{const user=await requireUser(req),body=await req.json();if(!body.age18||!body.termsAccepted)return NextResponse.json({error:"You must be 18 or older and accept the Terms and Privacy Policy."},{status:400});const db=supabaseAdmin();const now=new Date().toISOString();const{error}=await db.from("account_consents").upsert({user_id:user.id,terms_version:"2026-09-06",privacy_version:"2026-09-06",accepted_at:now,updated_at:now});if(error)throw error;return NextResponse.json({ok:true});}catch(e){return NextResponse.json({error:(e as Error).message==="UNAUTHORIZED"?"Sign in required.":"Could not record consent."},{status:(e as Error).message==="UNAUTHORIZED"?401:500});}}

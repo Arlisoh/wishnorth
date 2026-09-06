@@ -1,8 +1,2 @@
-export default function Footer() {
-  return (
-    <footer className="footer">
-      <div><strong>Wish North</strong> · A little holiday magic, built by <a href="https://metricnorth.ai">Metric North</a>.</div>
-      <div className="footer-note">Managed child lists have no child login, messaging, public profile, or email address.</div>
-    </footer>
-  );
-}
+import Link from "next/link";
+export default function Footer(){return <footer className="footer"><div><strong>Wish North</strong> · Built by <a href="https://metricnorth.ai" target="_blank" rel="noreferrer">Metric North</a>.</div><div className="footer-links"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href="/cookies">Cookies & storage</Link><Link href="/report">Report abuse</Link></div><div className="footer-note">Accounts are for adults 18+. Child lists are adult-managed and have no child login, messaging, public profile, or email address.</div></footer>}
