@@ -73,13 +73,14 @@ export default function TrendPanel({ full = false }: { full?: boolean }) {
 
   return <div className={`wish-index ${full ? "wish-index-full" : ""}`}>
     <div className="wish-index-kpis">
-      <Kpi value={data.totalWishes.toLocaleString()} label="Total wishes" />
-      <Kpi value={data.totalLists.toLocaleString()} label="Wish lists" />
-      <Kpi value={`${topVelocity}`} label="Top Wish Velocity" hint="Relative score out of 100" />
-      <Kpi value={`${data.giftGap.uncoveredPercent}%`} label="Gift Gap" hint={`${data.giftGap.uncoveredWishes} wishes not yet covered`} />
-      <Kpi value={data.medianPriceCents != null ? money(data.medianPriceCents) || "Not available" : "Not available"} label="Median wish price" />
-      <Kpi value={`${data.claimIntentPercent}%`} label="Marked covered" hint="Gift-giver intent, not confirmed sales" />
+      <Kpi icon="✦" tone="green" value={data.totalWishes.toLocaleString()} label="Total wishes" />
+      <Kpi icon="☰" tone="red" value={data.totalLists.toLocaleString()} label="Wish lists" />
+      <Kpi icon="↗" tone="gold" value={`${topVelocity}`} label="Top Wish Velocity" hint="Relative score out of 100" />
+      <Kpi icon="○" tone="blue" value={`${data.giftGap.uncoveredPercent}%`} label="Gift Gap" hint={`${data.giftGap.uncoveredWishes} wishes not yet covered`} />
+      {full ? <><Kpi icon="$" tone="green" value={data.medianPriceCents != null ? money(data.medianPriceCents) || "Not available" : "Not available"} label="Median wish price" /><Kpi icon="✓" tone="red" value={`${data.claimIntentPercent}%`} label="Marked covered" hint="Gift-giver intent, not confirmed sales" /></> : null}
     </div>
+
+    <IndexVisuals data={data} />
 
     {full && data.newsroom ? <Newsroom newsroom={data.newsroom} /> : null}
     {full ? <section className="index-filter-panel">
@@ -99,7 +100,7 @@ export default function TrendPanel({ full = false }: { full?: boolean }) {
     <div className="index-dual"><Leaderboard title="Top categories" eyebrow="WHERE WISHES ARE GOING" rows={data.categories.slice(0, full ? 8 : 5)} /><Leaderboard title="Top retailers" eyebrow="WHERE DEMAND LANDS" rows={data.retailers.slice(0, full ? 8 : 5)} /></div>
     {full ? <>
       <section className="index-block"><div className="index-section-head"><div><div className="eyebrow">MOMENTUM</div><h3>Fastest-rising wishes</h3></div><p>Latest 7 days vs. the previous 7.</p></div>
-        {data.rising.length ? <div className="rising-grid">{data.rising.map(item => <div className="rising-card" key={item.title}>{item.imageUrl ? <img src={item.imageUrl} alt="" /> : <div className="index-thumb-placeholder">🎁</div>}<div><span>{item.category || "Other"}</span><strong>{item.title}</strong><small>{item.retailer || "Retailer"}</small><b>{item.newThisWeek ? "NEW THIS WEEK" : `${item.wishShareChange > 0 ? "↑" : "↓"} ${Math.abs(item.wishShareChange)} share points`}</b></div></div>)}</div> : <div className="index-empty-inline">More repeat wishes are needed before momentum rankings become statistically meaningful.</div>}
+        {data.rising.length ? <div className="rising-grid">{data.rising.map(item => <div className="rising-card" key={item.title}>{item.imageUrl ? <img src={productImage(item.imageUrl)} alt={item.title} /> : <div className="index-thumb-placeholder">🎁</div>}<div><span>{item.category || "Other"}</span><strong>{item.title}</strong><small>{item.retailer || "Retailer"}</small><b>{item.newThisWeek ? "NEW THIS WEEK" : `${item.wishShareChange > 0 ? "↑" : "↓"} ${Math.abs(item.wishShareChange)} share points`}</b></div></div>)}</div> : <div className="index-empty-inline">More repeat wishes are needed before momentum rankings become statistically meaningful.</div>}
       </section>
 
       <RetailerView rows={data.retailerInsights} selected={selectedRetailer} value={retailerView} onChange={setRetailerView} />
@@ -125,9 +126,27 @@ function HistoryPanel({ history }: { history: HistoryPoint[] }) {
   return <section className="index-block"><div className="index-section-head"><div><div className="eyebrow">INDEX HISTORY</div><h3>Daily wish activity</h3></div><p>{history.length} daily snapshots retained</p></div><div className="history-bars">{recent.map(point => <div key={point.snapshot_date} title={`${point.snapshot_date}: ${point.sample_wishes} wishes`}><i style={{ height: `${Math.max(8, (point.sample_wishes / max) * 100)}%` }} /><span>{new Date(`${point.snapshot_date}T12:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span></div>)}</div></section>;
 }
 function ProductCard({ product }: { product: Product }) {
-  return <article className="index-product-card"><div className="index-product-image">{product.imageUrl ? <img src={product.imageUrl} alt="" loading="lazy" /> : <div className="index-thumb-placeholder">🎁</div>}<span className="index-rank">#{product.rank}</span></div><div className="index-product-copy"><span className="index-category">{product.category || "Other"}</span><h4>{product.title}</h4><div className="index-retailer">{product.retailer || "Retailer not listed"}</div><div className="index-score-row"><span><b>{product.wishVelocity}</b> Velocity</span><span><b>{product.wishShare}%</b> Share</span><span className={product.wishShareChange > 0 ? "positive" : product.wishShareChange < 0 ? "negative" : ""}><b>{product.wishShareChange > 0 ? "+" : ""}{product.wishShareChange}</b> pts</span></div><div className="index-product-meta"><strong>{product.count} {product.count === 1 ? "wish" : "wishes"}</strong>{product.priceCents != null ? <span>{money(product.priceCents, product.currency || "USD")}</span> : null}<span>{product.uncoveredCount} open</span></div>{product.url ? <a href={product.url} target="_blank" rel="noopener noreferrer">View product ↗</a> : null}</div></article>;
+  return <article className="index-product-card"><div className="index-product-image">{product.imageUrl ? <img src={productImage(product.imageUrl)} alt={product.title} loading="lazy" /> : <div className="index-thumb-placeholder">🎁</div>}<span className="index-rank">#{product.rank}</span></div><div className="index-product-copy"><span className="index-category">{product.category || "Other"}</span><h4>{product.title}</h4><div className="index-retailer">{product.retailer || "Retailer not listed"}</div><div className="index-score-row"><span><b>{product.wishVelocity}</b> Velocity</span><span><b>{product.wishShare}%</b> Share</span><span className={product.wishShareChange > 0 ? "positive" : product.wishShareChange < 0 ? "negative" : ""}><b>{product.wishShareChange > 0 ? "+" : ""}{product.wishShareChange}</b> pts</span></div><div className="index-product-meta"><strong>{product.count} {product.count === 1 ? "wish" : "wishes"}</strong>{product.priceCents != null ? <span>{money(product.priceCents, product.currency || "USD")}</span> : null}<span>{product.uncoveredCount} open</span></div>{product.url ? <a href={product.url} target="_blank" rel="noopener noreferrer">View product ↗</a> : null}</div></article>;
 }
 function Leaderboard({ title, eyebrow, rows }: { title: string; eyebrow: string; rows: Leader[] }) {
   return <section className="index-panel"><div className="eyebrow">{eyebrow}</div><h3>{title}</h3>{rows.length ? <div className="index-bars">{rows.map((row, index) => <div className="index-bar-row" key={row.name}><span className="bar-rank">{index + 1}</span><div><strong>{row.name}</strong><span><i style={{ width: `${Math.max(4, row.share)}%` }} /></span></div><b>{row.share}%</b></div>)}</div> : <p className="index-muted">Waiting for enough real wish activity.</p>}</section>;
 }
-function Kpi({ value, label, hint }: { value: string; label: string; hint?: string }) { return <div className="index-kpi"><strong>{value}</strong><span>{label}</span>{hint ? <small>{hint}</small> : null}</div>; }
+function IndexVisuals({ data }: { data: TrendResponse }) {
+  const topVelocity = Math.max(0, ...data.products.map(product => product.wishVelocity));
+  const maxBand = Math.max(1, ...data.priceBands.map(row => row.count));
+  const retailers = data.retailers.slice(0, 4);
+  const palette = ["#c8463f", "#d9a84a", "#2d6a57", "#6f88a6"];
+  let cursor = 0;
+  const segments = retailers.map((row, index) => { const start = cursor; cursor += row.share; return `${palette[index]} ${start}% ${cursor}%`; });
+  const donut = segments.length ? `conic-gradient(${segments.join(",")})` : "#e4e7ec";
+  return <section className="index-visual-grid">
+    <article className="index-visual-card velocity-visual"><div><div className="eyebrow">WISH VELOCITY</div><h3>Demand at a glance</h3><p>Volume, momentum, recency and stated priority, combined.</p></div><div className="velocity-dial" style={{ "--score": `${topVelocity * 3.6}deg` } as React.CSSProperties}><div><strong>{topVelocity}</strong><span>out of 100</span></div></div></article>
+    <article className="index-visual-card"><div className="eyebrow">PRICE LANDSCAPE</div><h3>Where wishes fall</h3><div className="price-columns">{data.priceBands.map(row => <div key={row.name}><b style={{ height: `${Math.max(8, (row.count / maxBand) * 100)}%` }}><i>{row.share}%</i></b><span>{row.name.replace("$", "$\u200b")}</span></div>)}</div></article>
+    <article className="index-visual-card retailer-share-visual"><div><div className="eyebrow">RETAILER SHARE</div><h3>Where demand lands</h3><div className="donut-legend">{retailers.map((row, index) => <div key={row.name}><i style={{ background: palette[index] }} /><span>{row.name}</span><b>{row.share}%</b></div>)}</div></div><div className="share-donut" style={{ background: donut }}><div><strong>{data.sampleWishes}</strong><span>wishes</span></div></div></article>
+  </section>;
+}
+function productImage(url: string) {
+  const secure = url.replace(/^http:\/\//i, "https://");
+  return `/.netlify/images?url=${encodeURIComponent(secure)}&w=720&h=720&fit=cover&q=84`;
+}
+function Kpi({ value, label, hint, icon, tone = "green" }: { value: string; label: string; hint?: string; icon?: string; tone?: string }) { return <div className={`index-kpi tone-${tone}`}><i>{icon}</i><div><strong>{value}</strong><span>{label}</span>{hint ? <small>{hint}</small> : null}</div></div>; }
