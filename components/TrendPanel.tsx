@@ -35,12 +35,12 @@ export default function TrendPanel({ full = false }: { full?: boolean }) {
   const [sort, setSort] = useState<SortMode>("top"), [retailerView, setRetailerView] = useState("");
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch(`/api/trends?t=${Date.now()}`, { cache: "no-store" });
+      const res = await fetch("/api/trends");
       if (!res.ok) throw new Error("Could not load Wish Index");
       setData({ ...EMPTY, ...(await res.json()) });
     } catch { /* Keep the last good result. */ } finally { setLoaded(true); }
   }, []);
-  useEffect(() => { refresh(); const timer = window.setInterval(refresh, 30000); window.addEventListener("focus", refresh); return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); }; }, [refresh]);
+  useEffect(() => { refresh(); const timer = window.setInterval(refresh, 300000); window.addEventListener("focus", refresh); return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); }; }, [refresh]);
   useEffect(() => { if (!retailerView && data.retailerInsights[0]) setRetailerView(data.retailerInsights[0].name); }, [data.retailerInsights, retailerView]);
 
   const products = useMemo(() => {

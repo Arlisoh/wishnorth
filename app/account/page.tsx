@@ -118,7 +118,7 @@ function AuthPanel({ mode, setMode, notice, setNotice, error, setError }: {
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/account/reset` });
         if (error) throw error;
-        setNotice("Password reset email sent. Open the link in that email to choose a new password.");
+        setNotice("If an account exists for that email, a password reset link is on its way. If it does not arrive, check spam or create an account first.");
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Account request failed.");

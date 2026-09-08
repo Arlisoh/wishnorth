@@ -187,7 +187,13 @@ export async function GET(req: Request) {
         giftGap: "Gift Gap measures wishes that have not yet been marked covered. It describes open gifting intent, not inventory or guaranteed sales.",
       } };
     if (requestUrl.searchParams.get("format") === "csv") return new NextResponse(productCsv(products as unknown as Array<Record<string, unknown>>), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="wish-north-index-${new Date().toISOString().slice(0, 10)}.csv"`, "Cache-Control": "no-store, max-age=0" } });
-    return NextResponse.json(response, { headers: { "Cache-Control": "no-store, max-age=0" } });
+    const responseHeaders: Record<string, string> = snapshotMode
+      ? { "Cache-Control": "no-store, max-age=0" }
+      : {
+          "Cache-Control": "public, max-age=0, must-revalidate",
+          "Netlify-CDN-Cache-Control": "public, durable, max-age=300, stale-while-revalidate=3600",
+        };
+    return NextResponse.json(response, { headers: responseHeaders });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ generatedAt: new Date().toISOString(), products: [], rising: [], categories: [], retailers: [], retailerInsights: [], priceBands: [], regions: [], cities: [], history: [], totalWishes: 0, totalLists: 0, sampleWishes: 0, medianPriceCents: null, averagePriceCents: null, claimIntentPercent: 0, giftGap: { uncoveredWishes: 0, coveredWishes: 0, uncoveredPercent: 0 }, filterOptions: { categories: [], retailers: [] } }, { headers: { "Cache-Control": "no-store, max-age=0" } });
