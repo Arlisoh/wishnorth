@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rateLimit";
 import { supabaseAdmin } from "@/lib/supabase";
 import { hashKey } from "@/lib/security";
+import { assertPasswordNotCompromised, UnsafePasswordError } from "@/lib/passwordSecurity";
 
 export async function POST(req: Request) {
   try {
@@ -13,6 +14,7 @@ export async function POST(req: Request) {
     if (!/^\S+@\S+\.\S+$/.test(email) || password.length < 8) return NextResponse.json({ error: "Enter a valid email and a password of at least 8 characters." }, { status: 400 });
     await enforceRateLimit(req, "auth-signup-network", 20, 3_600);
     await enforceRateLimit(req, `auth-signup-email:${hashKey(email)}`, 3, 3_600);
+    await assertPasswordNotCompromised(password);
 
     const origin = process.env.NEXT_PUBLIC_SITE_URL || "https://wishnorth.netlify.app";
     const admin = supabaseAdmin();
@@ -48,6 +50,7 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ ok: true, confirmationRequired: true });
   } catch (error) {
+    if (error instanceof UnsafePasswordError) return NextResponse.json({ error: "That password appears in known data breaches. Choose a different password." }, { status: 400 });
     const status = (error as Error & { status?: number }).status || 500;
     return NextResponse.json({ error: status === 429 ? "Too many signup attempts. Please try again later." : "Account signup is temporarily unavailable." }, { status });
   }

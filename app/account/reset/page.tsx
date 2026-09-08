@@ -19,6 +19,9 @@ export default function ResetPasswordPage() {
 
   async function submit(e: FormEvent) {
     e.preventDefault(); setError(""); setMessage("");
+    const check = await fetch("/api/auth/password-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password }) });
+    const checkResult = await check.json();
+    if (!check.ok) { setError(checkResult.error || "Choose a different password."); return; }
     const { error } = await supabaseBrowser().auth.updateUser({ password });
     if (error) setError(error.message);
     else setMessage("Password updated. You can return to your account now.");
