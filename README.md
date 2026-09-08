@@ -14,7 +14,7 @@ Wish North is the Metric North holiday wishlist MVP. v0.3 adds persistent adult 
 - Private daily snapshots for historical and future year-over-year reporting
 - Daily Netlify scheduled function at 05:15 UTC
 
-Run the migration in `supabase/migrations/20260908150918_wish_index_history.sql` before deploying v0.6. The snapshot table is private and available only to the server service role.
+Apply the ordered files in `supabase/migrations/` before deploying. The snapshot and operational tables are private and available only to the server service role.
 
 ## What works now
 
@@ -25,7 +25,9 @@ Run the migration in `supabase/migrations/20260908150918_wish_index_history.sql`
 - Parent-managed child lists still have no child login/email/profile
 - Add products from URLs with manual fallback
 - Delete wishes from your own list
+- Edit wishes in place
 - Private share links
+- QR codes and native Web Share with copy-link fallback
 - Claim gifts without an account
 - Logged-in claims save automatically to **My Gifts**
 - Anonymous claims are saved locally, then automatically attach after sign-in/account creation on that browser
@@ -33,6 +35,11 @@ Run the migration in `supabase/migrations/20260908150918_wish_index_history.sql`
 - Release a claim so someone else can buy it
 - **My Lists** works cross-device for signed-in users
 - Real-only Wish Index
+- Database-backed API rate limiting with privacy-preserving request fingerprints
+- Abuse reporting and an authenticated admin moderation console
+- Retailer image caching in Supabase Storage plus Netlify Image CDN delivery
+- Privacy Policy, Terms of Use, and cookie/storage disclosure
+- Self-service account and associated data deletion
 
 ## Upgrade an existing Wish North Supabase database
 
@@ -67,7 +74,7 @@ Keep email confirmation enabled for a public launch.
 
 ## Netlify environment variables
 
-The original three remain, and v0.3 adds two safe browser-side Supabase variables:
+Production uses these variables:
 
 ```env
 NEXT_PUBLIC_SITE_URL=https://wishnorth.netlify.app
@@ -75,17 +82,19 @@ SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVER_SECRET_KEY
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
+ADMIN_EMAILS=you@example.com
+RATE_LIMIT_SALT=replace-with-a-long-random-secret
 ```
 
 Find the publishable key in Supabase → Settings → API Keys. It commonly begins with `sb_publishable_` and is intended for browser use.
 
-Never expose the secret/service-role key as a `NEXT_PUBLIC_` variable.
+Never expose the secret/service-role key or rate-limit salt as a `NEXT_PUBLIC_` variable. `ADMIN_EMAILS` is a comma-separated allowlist checked after Supabase authentication.
 
 ## Deployment
 
-1. Run `supabase/v0.3-accounts.sql` once.
-2. Replace/upload the v0.3 project files in the existing GitHub repo.
-3. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to Netlify.
+1. Apply any pending ordered files from `supabase/migrations/`.
+2. Add all variables shown above to Netlify.
+3. Run `npm run build` locally.
 4. Confirm Supabase Authentication URL Configuration above.
 5. Commit to `main`; Netlify should deploy automatically.
 
@@ -107,11 +116,10 @@ With Supabase email confirmation enabled, a brand-new signup may need to click t
 - Server routes verify the user's Supabase Auth JWT before using the server secret key for authorized database operations.
 - Legacy owner keys and anonymous claim codes are random high-entropy secrets; only SHA-256 hashes are stored in the database.
 
-## Before broad public promotion
+## Public-launch controls
 
-- Add production rate limiting / bot protection.
-- Add abuse reporting and an admin takedown console.
-- Add Privacy Policy, Terms, cookie disclosure if applicable, and final COPPA/privacy review.
-- Proxy/store retailer images instead of indefinitely hotlinking them.
-- Add edit-in-place for wishes (v0.3 supports deletion and re-addition).
-- Add QR/Web Share and better retailer/product normalization.
+- Production rate limiting, a hidden-field bot trap, bounded remote fetches, and server-side URL validation are active. Cloudflare Turnstile remains an optional escalation if automated abuse appears.
+- Reports are stored in Supabase and handled through `/admin`; admin identity is restricted by `ADMIN_EMAILS`.
+- Privacy Policy, Terms of Use, and cookie/storage disclosure are published. Final legal and COPPA review by qualified counsel remains an external launch decision, not a software control.
+- New retailer images are copied to Supabase Storage when possible. Legacy and fallback images are delivered through Netlify Image CDN rather than loaded directly in the browser.
+- Edit-in-place, QR sharing, native Web Share, URL normalization, retailer normalization, and category normalization are active.

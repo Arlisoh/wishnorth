@@ -32,12 +32,45 @@ const RULES: Array<{ category: WishCategory; words: string[] }> = [
   { category: "Experiences", words: ["ticket", "concert", "spa", "massage", "hotel", "trip", "vacation", "restaurant", "experience", "membership", "subscription"] },
 ];
 
+const DOMAIN_CATEGORIES: Record<string, WishCategory> = {
+  "flaviar.com": "Wine, Beer & Spirits",
+  "wine.com": "Wine, Beer & Spirits",
+  "totalwine.com": "Wine, Beer & Spirits",
+  "cincyshirts.com": "Apparel & Accessories",
+  "nike.com": "Apparel & Accessories",
+  "adidas.com": "Apparel & Accessories",
+  "sephora.com": "Beauty & Personal Care",
+  "ulta.com": "Beauty & Personal Care",
+  "lego.com": "Toys & Games",
+  "gamestop.com": "Books, Media & Gaming",
+};
+
+function domainFromUnknown(value: unknown) {
+  try {
+    const host = new URL(String(value || "")).hostname.toLowerCase().replace(/^www\./, "");
+    const exact = Object.keys(DOMAIN_CATEGORIES).find(domain => host === domain || host.endsWith(`.${domain}`));
+    return exact || "";
+  } catch {
+    return "";
+  }
+}
+
+function containsPhrase(haystack: string, phrase: string) {
+  const normalizedPhrase = phrase.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return ` ${haystack} `.includes(` ${normalizedPhrase} `);
+}
+
 export function categorizeWish(input: { title?: unknown; retailer?: unknown; url?: unknown; rawCategory?: unknown }): WishCategory {
+  const domain = domainFromUnknown(input.url);
+  if (domain && DOMAIN_CATEGORIES[domain]) return DOMAIN_CATEGORIES[domain];
   const haystack = [input.title, input.retailer, input.url, input.rawCategory]
     .map(v => String(v || "").toLowerCase())
-    .join(" ");
+    .join(" ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   for (const rule of RULES) {
-    if (rule.words.some(word => haystack.includes(word))) return rule.category;
+    if (rule.words.some(word => containsPhrase(haystack, word))) return rule.category;
   }
   return "Other";
 }

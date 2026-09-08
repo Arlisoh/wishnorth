@@ -7,6 +7,7 @@ import { supabaseBrowser } from "@/lib/supabase-browser";
 import { accessToken } from "@/lib/client-auth";
 import { syncLocalAccess } from "@/lib/client-sync";
 import { money } from "@/lib/helpers";
+import { productImageUrl } from "@/lib/productImage";
 
 type Claim = {
   id: string;
@@ -31,7 +32,13 @@ export default function MyGiftsPage() {
       const res = await fetch("/api/account", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not load gifts");
-      setClaims(data.claims || []);
+      setClaims((data.claims || []).map((claim: Claim) => ({
+        ...claim,
+        item: {
+          ...claim.item,
+          image_url: claim.item.image_url ? productImageUrl(claim.item.image_url) : null,
+        },
+      })));
     } catch (e) { setError(e instanceof Error ? e.message : "Could not load gifts"); }
     finally { setLoading(false); }
   }, []);

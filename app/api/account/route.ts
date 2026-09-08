@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { enforceRateLimit } from "@/lib/rateLimit";
 
 export async function GET(req: Request) {
   try {
@@ -73,5 +74,24 @@ export async function GET(req: Request) {
     }
     console.error(e);
     return NextResponse.json({ error: "Could not load your account." }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const user = await requireUser(req);
+    await enforceRateLimit(req, "delete-account", 3, 86_400);
+    const body = await req.json();
+    if (body.confirm !== "DELETE MY ACCOUNT") return NextResponse.json({ error: "Account deletion was not confirmed." }, { status: 400 });
+    const db = supabaseAdmin();
+    const { error: dataError } = await db.rpc("delete_account_data", { p_user_id: user.id });
+    if (dataError) throw dataError;
+    const { error: userError } = await db.auth.admin.deleteUser(user.id);
+    if (userError) throw userError;
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const status = (error as Error & { status?: number }).status || (message === "UNAUTHORIZED" ? 401 : 500);
+    return NextResponse.json({ error: status === 401 ? "Please sign in." : status === 429 ? "Too many account deletion attempts." : status === 503 ? "Account deletion is temporarily unavailable." : "Could not delete your account." }, { status });
   }
 }

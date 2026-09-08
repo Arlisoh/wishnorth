@@ -31,8 +31,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     const priceNumber = body.price === "" || body.price == null ? null : Number(String(body.price).replace(/[^0-9.]/g, ""));
     const priceCents = typeof priceNumber === "number" && Number.isFinite(priceNumber) ? Math.round(priceNumber * 100) : null;
-    const url = normalizeProductUrl(body.url || "");
-    const cached = await cacheProductImage(body.imageUrl || null);
+    const url = normalizeProductUrl(String(body.url || "").slice(0, 2_048));
+    const cached = await cacheProductImage(String(body.imageSourceUrl || body.imageUrl || "").slice(0, 2_048) || null);
     const normalized = normalizeTitle(title);
     const domain = retailerDomain(url);
     const store = normalizeRetailer(body.retailer, url) || null;
@@ -44,7 +44,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       title: title.slice(0, 300),
       url: url || null,
       normalized_url: url || null,
-      image_url: cached.imageUrl || body.imageUrl || null,
+      image_url: cached.imageUrl,
       image_source_url: body.imageSourceUrl || cached.sourceUrl || null,
       image_cached_at: cached.imageUrl ? new Date().toISOString() : null,
       retailer: store,
@@ -54,9 +54,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       category,
       brand,
       price_cents: priceCents,
-      size: body.size || null,
-      color: body.color || null,
-      notes: body.notes || null,
+      size: String(body.size || "").trim().slice(0, 100) || null,
+      color: String(body.color || "").trim().slice(0, 100) || null,
+      notes: String(body.notes || "").trim().slice(0, 2_000) || null,
       priority: Math.min(3, Math.max(1, Number(body.priority) || 1)),
       updated_at: new Date().toISOString(),
     };
