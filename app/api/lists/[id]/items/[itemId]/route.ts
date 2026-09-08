@@ -5,6 +5,96 @@ import { userFromRequest } from "@/lib/auth";
 import { enforceRateLimit, rejectBot } from "@/lib/rateLimit";
 import { cacheProductImage } from "@/lib/imageCache";
 import { normalizeProductUrl, normalizeRetailer, retailerDomain, normalizeTitle, productKey } from "@/lib/normalize";
-async function authorize(req:Request,id:string){const key=req.headers.get("x-owner-key")||"",user=await userFromRequest(req),db=supabaseAdmin();const{data:list}=await db.from("wish_lists").select("owner_key_hash,owner_user_id").eq("id",id).single();if(!list)return null;const ok=(Boolean(key)&&hashKey(key)===list.owner_key_hash)||Boolean(user&&list.owner_user_id===user.id);return ok?db:null;}
-export async function PATCH(req:Request,{params}:{params:Promise<{id:string;itemId:string}>}){try{await enforceRateLimit(req,"edit-wish",80,3600);const{id,itemId}=await params,db=await authorize(req,id);if(!db)return NextResponse.json({error:"Not authorized."},{status:403});const body=await req.json();rejectBot(body);const title=String(body.title||"").trim();if(!title)return NextResponse.json({error:"Item name is required."},{status:400});const priceNumber=body.price===""||body.price==null?null:Number(String(body.price).replace(/[^0-9.]/g,""));const priceCents=typeof priceNumber==="number"&&Number.isFinite(priceNumber)?Math.round(priceNumber*100):null;const url=normalizeProductUrl(body.url||""),cached=await cacheProductImage(body.imageUrl||null),normalized=normalizeTitle(title),domain=retailerDomain(url),pkey=productKey(title,url);const payload={title:title.slice(0,300),url:url||null,normalized_url:url||null,image_url:cached.imageUrl||body.imageUrl||null,image_source_url:body.imageSourceUrl||cached.sourceUrl||null,image_cached_at:cached.imageUrl?new Date().toISOString():null,retailer:normalizeRetailer(body.retailer,url)||null,retailer_domain:domain||null,normalized_title:normalized,product_key:pkey,price_cents:priceCents,size:body.size||null,color:body.color||null,notes:body.notes||null,priority:Math.min(3,Math.max(1,Number(body.priority)||1)),updated_at:new Date().toISOString()};const{data:item,error}=await db.from("wish_items").update(payload).eq("id",itemId).eq("list_id",id).select("*").single();if(error)throw error;await db.from("trend_events").update({title_normalized:normalized,retailer:payload.retailer,retailer_domain:domain||null,product_key:pkey,price_cents:priceCents}).eq("item_id",itemId);return NextResponse.json({item});}catch(e){const status=(e as Error&{status?:number}).status||500;return NextResponse.json({error:status===429?"Too many edits. Please try again shortly.":"Could not edit that wish."},{status});}}
-export async function DELETE(req:Request,{params}:{params:Promise<{id:string;itemId:string}>}){try{await enforceRateLimit(req,"delete-wish",80,3600);const{id,itemId}=await params,db=await authorize(req,id);if(!db)return NextResponse.json({error:"Not authorized."},{status:403});const{data:item}=await db.from("wish_items").select("id").eq("id",itemId).eq("list_id",id).single();if(!item)return NextResponse.json({error:"Wish not found."},{status:404});await db.from("trend_events").delete().eq("item_id",itemId);const{error}=await db.from("wish_items").delete().eq("id",itemId).eq("list_id",id);if(error)throw error;return NextResponse.json({ok:true});}catch(e){const status=(e as Error&{status?:number}).status||500;return NextResponse.json({error:status===429?"Too many changes. Please try again shortly.":"Could not delete that wish."},{status});}}
+import { categorizeWish } from "@/lib/category";
+
+async function authorize(req: Request, id: string) {
+  const key = req.headers.get("x-owner-key") || "";
+  const user = await userFromRequest(req);
+  const db = supabaseAdmin();
+  const { data: list } = await db.from("wish_lists").select("owner_key_hash,owner_user_id").eq("id", id).single();
+  if (!list) return null;
+  const ok = (Boolean(key) && hashKey(key) === list.owner_key_hash) || Boolean(user && list.owner_user_id === user.id);
+  return ok ? db : null;
+}
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; itemId: string }> }) {
+  try {
+    await enforceRateLimit(req, "edit-wish", 80, 3600);
+    const { id, itemId } = await params;
+    const db = await authorize(req, id);
+    if (!db) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+
+    const body = await req.json();
+    rejectBot(body);
+    const title = String(body.title || "").trim();
+    if (!title) return NextResponse.json({ error: "Item name is required." }, { status: 400 });
+
+    const priceNumber = body.price === "" || body.price == null ? null : Number(String(body.price).replace(/[^0-9.]/g, ""));
+    const priceCents = typeof priceNumber === "number" && Number.isFinite(priceNumber) ? Math.round(priceNumber * 100) : null;
+    const url = normalizeProductUrl(body.url || "");
+    const cached = await cacheProductImage(body.imageUrl || null);
+    const normalized = normalizeTitle(title);
+    const domain = retailerDomain(url);
+    const store = normalizeRetailer(body.retailer, url) || null;
+    const pkey = productKey(title, url);
+    const category = categorizeWish({ title, retailer: store, url, rawCategory: body.category });
+    const brand = String(body.brand || "").trim().slice(0, 120) || null;
+
+    const payload = {
+      title: title.slice(0, 300),
+      url: url || null,
+      normalized_url: url || null,
+      image_url: cached.imageUrl || body.imageUrl || null,
+      image_source_url: body.imageSourceUrl || cached.sourceUrl || null,
+      image_cached_at: cached.imageUrl ? new Date().toISOString() : null,
+      retailer: store,
+      retailer_domain: domain || null,
+      normalized_title: normalized,
+      product_key: pkey,
+      category,
+      brand,
+      price_cents: priceCents,
+      size: body.size || null,
+      color: body.color || null,
+      notes: body.notes || null,
+      priority: Math.min(3, Math.max(1, Number(body.priority) || 1)),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data: item, error } = await db.from("wish_items").update(payload).eq("id", itemId).eq("list_id", id).select("*").single();
+    if (error) throw error;
+
+    await db.from("trend_events").update({
+      title_normalized: normalized,
+      retailer: store,
+      retailer_domain: domain || null,
+      product_key: pkey,
+      category,
+      brand,
+      price_cents: priceCents,
+    }).eq("item_id", itemId);
+
+    return NextResponse.json({ item });
+  } catch (e) {
+    const status = (e as Error & { status?: number }).status || 500;
+    return NextResponse.json({ error: status === 429 ? "Too many edits. Please try again shortly." : "Could not edit that wish." }, { status });
+  }
+}
+
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string; itemId: string }> }) {
+  try {
+    await enforceRateLimit(req, "delete-wish", 80, 3600);
+    const { id, itemId } = await params;
+    const db = await authorize(req, id);
+    if (!db) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+    const { data: item } = await db.from("wish_items").select("id").eq("id", itemId).eq("list_id", id).single();
+    if (!item) return NextResponse.json({ error: "Wish not found." }, { status: 404 });
+    await db.from("trend_events").delete().eq("item_id", itemId);
+    const { error } = await db.from("wish_items").delete().eq("id", itemId).eq("list_id", id);
+    if (error) throw error;
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    const status = (e as Error & { status?: number }).status || 500;
+    return NextResponse.json({ error: status === 429 ? "Too many changes. Please try again shortly." : "Could not delete that wish." }, { status });
+  }
+}
