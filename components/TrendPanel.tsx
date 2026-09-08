@@ -11,13 +11,14 @@ type Product = {
   giftGapPercent: number; recent: number; prior: number; growthPercent: number | null; newThisWeek: boolean; wantScore?: number;
 };
 type Leader = { name: string; count: number; share: number };
+type PriceBand = { label: string; count: number; share: number };
 type Region = { region: string; regionCode?: string; country: string; count: number; topCategory?: string | null; topRetailer?: string | null };
 type City = { city: string; region: string; country: string; count: number; topCategory?: string | null };
 type RetailerInsight = { name: string; count: number; share: number; medianPriceCents: number | null; coveredPercent: number; wishShareChange: number; topCategory: string | null; topProducts: Array<{ title: string; count: number }> };
 type HistoryPoint = { snapshot_date: string; sample_wishes: number; total_wishes: number; total_lists: number; median_price_cents: number | null; claim_intent_percent: number };
 type TrendResponse = {
   generatedAt?: string; windowDays?: number; products: Product[]; rising: Product[]; categories: Leader[]; retailers: Leader[];
-  retailerInsights: RetailerInsight[]; priceBands: Leader[]; regions: Region[]; cities: City[]; history: HistoryPoint[];
+  retailerInsights: RetailerInsight[]; priceBands: PriceBand[]; regions: Region[]; cities: City[]; history: HistoryPoint[];
   totalWishes: number; totalLists: number; sampleWishes: number; medianPriceCents: number | null; averagePriceCents: number | null;
   claimIntentPercent: number; giftGap: { uncoveredWishes: number; coveredWishes: number; uncoveredPercent: number };
   filterOptions: { categories: string[]; retailers: string[] };
@@ -105,7 +106,7 @@ export default function TrendPanel({ full = false }: { full?: boolean }) {
 
       <RetailerView rows={data.retailerInsights} selected={selectedRetailer} value={retailerView} onChange={setRetailerView} />
       <HistoryPanel history={data.history} />
-      <div className="index-dual"><Leaderboard title="Price mix" eyebrow="WHAT PEOPLE EXPECT TO SPEND" rows={data.priceBands.filter(row => row.count > 0)} /><section className="index-panel"><div className="eyebrow">REGIONAL PULSE</div><h3>What different areas want</h3>{data.regions.length ? <div className="region-list">{data.regions.map(region => <div key={`${region.country}-${region.region}`}><strong>{region.region}</strong><span>{region.count} wishes · #{region.topCategory || "Mixed"}</span><small>Top retailer: {region.topRetailer || "Mixed"}</small></div>)}</div> : <p className="index-muted">Regional results appear only after a market reaches the privacy threshold. No individual locations are published.</p>}</section></div>
+      <div className="index-dual"><Leaderboard title="Price mix" eyebrow="WHAT PEOPLE EXPECT TO SPEND" rows={data.priceBands.filter(row => row.count > 0).map(row => ({ ...row, name: row.label }))} /><section className="index-panel"><div className="eyebrow">REGIONAL PULSE</div><h3>What different areas want</h3>{data.regions.length ? <div className="region-list">{data.regions.map(region => <div key={`${region.country}-${region.region}`}><strong>{region.region}</strong><span>{region.count} wishes · #{region.topCategory || "Mixed"}</span><small>Top retailer: {region.topRetailer || "Mixed"}</small></div>)}</div> : <p className="index-muted">Regional results appear only after a market reaches the privacy threshold. No individual locations are published.</p>}</section></div>
       {data.cities.length ? <section className="index-block"><div className="eyebrow">METRO WATCH</div><h3>Markets with enough activity to report</h3><div className="metro-grid">{data.cities.map(city => <div key={`${city.city}-${city.region}`}><strong>{city.city}</strong><span>{city.region}</span><b>{city.topCategory || "Mixed"}</b><small>{city.count} wishes in the 30-day sample</small></div>)}</div></section> : null}
       <section className="index-methodology"><div><div className="eyebrow">ABOUT THE INDEX</div><h3>Real wish behavior, aggregated for privacy.</h3></div><div className="methodology-copy"><p>{data.methodology?.note}</p><p><strong>Wish Velocity:</strong> {data.methodology?.velocity}</p><p><strong>Wish Share:</strong> {data.methodology?.wishShare}</p><p><strong>Gift Gap:</strong> {data.methodology?.giftGap}</p><p><strong>Current 30-day sample:</strong> {data.sampleWishes.toLocaleString()} wishes.</p></div></section>
     </> : <div className="index-more"><Link href="/wish-index" className="button button-dark">Explore the full Wish North Index →</Link><span>Wish Velocity, Wish Share, Gift Gap, retailers, regions and weekly stories.</span></div>}
@@ -141,7 +142,7 @@ function IndexVisuals({ data }: { data: TrendResponse }) {
   const donut = segments.length ? `conic-gradient(${segments.join(",")})` : "#e4e7ec";
   return <section className="index-visual-grid">
     <article className="index-visual-card velocity-visual"><div><div className="eyebrow">WISH VELOCITY</div><h3>Demand at a glance</h3><p>Volume, momentum, recency and stated priority, combined.</p></div><div className="velocity-dial" style={{ "--score": `${topVelocity * 3.6}deg` } as React.CSSProperties}><div><strong>{topVelocity}</strong><span>out of 100</span></div></div></article>
-    <article className="index-visual-card"><div className="eyebrow">PRICE LANDSCAPE</div><h3>Where wishes fall</h3><div className="price-columns">{data.priceBands.map(row => <div key={row.name}><b style={{ height: `${Math.max(8, (row.count / maxBand) * 100)}%` }}><i>{row.share}%</i></b><span>{row.name.replace("$", "$\u200b")}</span></div>)}</div></article>
+    <article className="index-visual-card"><div className="eyebrow">PRICE LANDSCAPE</div><h3>Where wishes fall</h3><div className="price-columns">{data.priceBands.map(row => <div key={row.label}><b style={{ height: `${Math.max(8, (row.count / maxBand) * 100)}%` }}><i>{row.share}%</i></b><span>{row.label.replace("$", "$\u200b")}</span></div>)}</div></article>
     <article className="index-visual-card retailer-share-visual"><div><div className="eyebrow">RETAILER SHARE</div><h3>Where demand lands</h3><div className="donut-legend">{retailers.map((row, index) => <div key={row.name}><i style={{ background: palette[index] }} /><span>{row.name}</span><b>{row.share}%</b></div>)}</div></div><div className="share-donut" style={{ background: donut }}><div><strong>{data.sampleWishes}</strong><span>wishes</span></div></div></article>
   </section>;
 }
