@@ -127,9 +127,7 @@ function AuthPanel({ mode, setMode, notice, setNotice, error, setError }: {
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Could not create account.");
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-        if (error) throw error;
-        setNotice("Account created. Saving your lists and claims now…");
+        setNotice("Check your email to confirm your Wish North account. Your lists and claims on this browser will be waiting when you sign in.");
       } else if (mode === "signin") {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;
