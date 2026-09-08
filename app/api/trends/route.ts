@@ -55,23 +55,25 @@ export async function GET(req: Request) {
     const db = supabaseAdmin(), now = Date.now();
     const since30 = new Date(now - 30 * DAY).toISOString(), since7 = now - 7 * DAY, since14 = now - 14 * DAY;
 
-    const [{ data: eventData, error }, wishCount, listCount] = await Promise.all([
+    const [eventResult, wishCount, listCount, itemResult, claimResult, snapshotResult] = await Promise.all([
       db.from("trend_events").select("item_id,product_key,title_normalized,retailer,retailer_domain,category,brand,price_cents,geo_country,geo_region,geo_region_code,geo_city,created_at")
         .gte("created_at", since30).eq("event_type", "wish_added").order("created_at", { ascending: false }).limit(10000),
       db.from("wish_items").select("id", { count: "exact", head: true }).eq("moderation_status", "active"),
       db.from("wish_lists").select("id", { count: "exact", head: true }).eq("moderation_status", "active"),
+      db.from("wish_items").select("id,title,url,image_url,retailer,retailer_domain,category,brand,price_cents,currency,priority,product_key")
+        .eq("moderation_status", "active").limit(10000),
+      db.from("gift_claims").select("item_id").limit(10000),
+      snapshotMode
+        ? Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null })
+        : db.from("wish_index_snapshots").select("snapshot_date,generated_at,sample_wishes,total_wishes,total_lists,median_price_cents,claim_intent_percent")
+          .order("snapshot_date", { ascending: true }).limit(400),
     ]);
-    if (error) throw error;
-    const events = (eventData || []) as EventRow[];
-    const itemIds = [...new Set(events.map(event => event.item_id).filter(Boolean))] as string[];
-    let items: ItemRow[] = [], claims: Array<{ item_id: string }> = [];
-    if (itemIds.length) {
-      const [{ data: itemData }, { data: claimData }] = await Promise.all([
-        db.from("wish_items").select("id,title,url,image_url,retailer,retailer_domain,category,brand,price_cents,currency,priority,product_key").in("id", itemIds).eq("moderation_status", "active"),
-        db.from("gift_claims").select("item_id").in("item_id", itemIds),
-      ]);
-      items = (itemData || []) as ItemRow[]; claims = (claimData || []) as Array<{ item_id: string }>;
-    }
+    const queryError = eventResult.error || itemResult.error || claimResult.error || snapshotResult.error;
+    if (queryError) throw queryError;
+    const events = (eventResult.data || []) as EventRow[];
+    const eventItemIds = new Set(events.map(event => event.item_id).filter(Boolean));
+    const items = ((itemResult.data || []) as ItemRow[]).filter(item => eventItemIds.has(item.id));
+    const claims = ((claimResult.data || []) as Array<{ item_id: string }>).filter(claim => eventItemIds.has(claim.item_id));
 
     const itemMap = new Map(items.map(item => [item.id, item])), claimedItems = new Set(claims.map(claim => claim.item_id));
     const categoryCounts = new Map<string, number>(), retailerCounts = new Map<string, number>();
@@ -171,11 +173,7 @@ export async function GET(req: Request) {
         fastestRiser?.wishShareChange > 0 ? `${fastestRiser.title} gained ${fastestRiser.wishShareChange} share points week over week.` : null,
         largestGap ? `${largestGap.title} has ${largestGap.uncoveredCount} currently uncovered ${largestGap.uncoveredCount === 1 ? "wish" : "wishes"}.` : null].filter(Boolean),
       generatedAt: new Date().toISOString() };
-    let history: Array<Record<string, unknown>> = [];
-    if (!snapshotMode) {
-      const { data: snapshotData } = await db.from("wish_index_snapshots").select("snapshot_date,generated_at,sample_wishes,total_wishes,total_lists,median_price_cents,claim_intent_percent").order("snapshot_date", { ascending: true }).limit(400);
-      history = snapshotData || [];
-    }
+    const history = snapshotMode ? [] : snapshotResult.data || [];
     const response = { generatedAt: newsroom.generatedAt, windowDays: 30, totalWishes: wishCount.count || 0, totalLists: listCount.count || 0, sampleWishes: total,
       products, rising, categories: leaderboard(categoryCounts, total), retailers: leaderboard(retailerCounts, total), retailerInsights, priceBands,
       medianPriceCents: median(prices), averagePriceCents: prices.length ? Math.round(prices.reduce((sum, value) => sum + value, 0) / prices.length) : null,
