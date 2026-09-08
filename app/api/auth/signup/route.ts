@@ -24,6 +24,7 @@ export async function POST(req: Request) {
       const exists = /already|registered|exists/i.test(error.message);
       return NextResponse.json({ error: exists ? "An account already exists for this email. Sign in instead." : "Could not create the account." }, { status: exists ? 409 : 400 });
     }
+    // Netlify exposes this only to server-side functions; it never reaches the browser.
     const resendKey = process.env.RESEND_API_KEY;
     if (!resendKey || !data.properties?.action_link) {
       await admin.auth.admin.deleteUser(data.user.id);
