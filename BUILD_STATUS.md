@@ -1,6 +1,6 @@
-# Wish North production hardening
+# Wish North production status
 
-Public-launch release promoted to main on September 6, 2026.
+Public-launch hardening is live. Wish North Index v0.5 is now on main.
 
 Included:
 - production rate limiting and bot protection
@@ -11,3 +11,9 @@ Included:
 - QR codes, Web Share, copy/text sharing
 - retailer/product URL and title normalization
 - security headers and admin allowlist
+- Wish Index product thumbnails, retailer names and categories
+- category and retailer leaderboards
+- price-band, median-price and claim-intent analytics
+- fastest-rising product signals
+- privacy-thresholded regional and metro trend reporting
+- dedicated /wish-index page for consumers, retailers and media
