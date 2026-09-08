@@ -12,7 +12,11 @@ export default async function wishGeo(req: Request, context: Context) {
   if (regionCode) headers.set("x-wish-geo-region-code", regionCode.slice(0, 20));
   if (city) headers.set("x-wish-geo-city", city.slice(0, 100));
 
-  return context.nextRequest(new Request(req, { headers }));
+  const forwardingContext = context as Context & {
+    nextRequest(request: Request): Promise<Response>;
+  };
+
+  return forwardingContext.nextRequest(new Request(req, { headers }));
 }
 
 export const config: Config = {
