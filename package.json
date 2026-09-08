@@ -1,6 +1,6 @@
 {
   "name": "wishnorth-mvp",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -16,10 +16,11 @@
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
+    "@netlify/edge-functions": "^2.18.0",
     "@types/node": "^22.18.0",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
-    "typescript": "^5.9.2",
-    "@types/qrcode": "^1.5.5"
+    "typescript": "^5.9.2"
   }
 }
