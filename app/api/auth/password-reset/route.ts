@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     const email = String(body.email || "").trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(email)) return generic;
 
-    const origin = new URL(req.url).origin;
+    const origin = process.env.NEXT_PUBLIC_SITE_URL || "https://wishnorth.netlify.app";
     const { data, error } = await supabaseAdmin().auth.admin.generateLink({
       type: "recovery",
       email,
