@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rateLimit";
 import { supabaseAdmin } from "@/lib/supabase";
+import { hashKey } from "@/lib/security";
 
 export async function POST(req: Request) {
   try {
-    await enforceRateLimit(req, "auth-signup", 5, 3_600);
     const body = await req.json();
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
     const firstName = String(body.firstName || "").trim().slice(0, 80);
     if (!body.adultConfirmed) return NextResponse.json({ error: "Adult confirmation is required." }, { status: 400 });
     if (!/^\S+@\S+\.\S+$/.test(email) || password.length < 8) return NextResponse.json({ error: "Enter a valid email and a password of at least 8 characters." }, { status: 400 });
+    await enforceRateLimit(req, "auth-signup-network", 20, 3_600);
+    await enforceRateLimit(req, `auth-signup-email:${hashKey(email)}`, 3, 3_600);
 
     const origin = process.env.NEXT_PUBLIC_SITE_URL || "https://wishnorth.netlify.app";
     const admin = supabaseAdmin();

@@ -8,7 +8,7 @@ const ACTIONS = new Set(["hide", "restore", "dismiss", "delete"]);
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const admin = await requireAdmin(req);
-    await enforceRateLimit(req, "admin-moderation", 120, 3_600);
+    await enforceRateLimit(req, `admin-moderation:${admin.id}`, 120, 3_600);
     const { id } = await params;
     const body = await req.json();
     const action = String(body.action || "");

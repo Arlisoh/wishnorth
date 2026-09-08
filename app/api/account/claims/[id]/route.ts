@@ -6,7 +6,7 @@ import { enforceRateLimit } from "@/lib/rateLimit";
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireUser(req);
-    await enforceRateLimit(req, "release-claim", 60, 3_600);
+    await enforceRateLimit(req, `release-claim:${user.id}`, 60, 3_600);
     const { id } = await params;
     const db = supabaseAdmin();
     const { data: claim } = await db.from("gift_claims").select("id,claimer_user_id").eq("id", id).single();

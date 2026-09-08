@@ -8,8 +8,8 @@ import { supabaseAdmin } from "@/lib/supabase";
 
 export async function POST(req: Request) {
   try {
-    await requireAdmin(req);
-    await enforceRateLimit(req, "admin-image-backfill", 20, 3_600);
+    const admin = await requireAdmin(req);
+    await enforceRateLimit(req, `admin-image-backfill:${admin.id}`, 20, 3_600);
     const db = supabaseAdmin();
     const { data: items, error } = await db
       .from("wish_items")

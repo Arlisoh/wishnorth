@@ -20,7 +20,10 @@ export async function syncLocalAccess() {
         headers: { "content-type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(entry),
       });
-      if (res.ok) lists += 1;
+      if (res.ok) {
+        lists += 1;
+        localStorage.removeItem(`wishnorth_owner_${entry.listId}`);
+      }
     } catch {}
   }
 
@@ -43,7 +46,11 @@ export async function syncLocalAccess() {
         headers: { "content-type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(entry),
       });
-      if (res.ok) claims += 1;
+      if (res.ok) {
+        claims += 1;
+        localStorage.removeItem(`wishnorth_claim_${entry.itemId}`);
+        sessionStorage.removeItem(`wishnorth_claim_${entry.itemId}`);
+      }
     } catch {}
   }
 

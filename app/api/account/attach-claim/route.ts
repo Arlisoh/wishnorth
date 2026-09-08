@@ -7,7 +7,6 @@ import { enforceRateLimit } from "@/lib/rateLimit";
 export async function POST(req: Request) {
   try {
     const user = await requireUser(req);
-    await enforceRateLimit(req, "attach-claim", 60, 3_600);
     const body = await req.json();
     const itemId = String(body.itemId || "");
     const claimCode = String(body.claimCode || "");
@@ -25,6 +24,8 @@ export async function POST(req: Request) {
     if (claim.claimer_user_id && claim.claimer_user_id !== user.id) {
       return NextResponse.json({ error: "That claim is already attached to another account." }, { status: 409 });
     }
+    if (claim.claimer_user_id === user.id) return NextResponse.json({ ok: true, alreadyAttached: true });
+    await enforceRateLimit(req, `attach-claim:${user.id}`, 60, 3_600);
     const { error: updateError } = await db.from("gift_claims").update({ claimer_user_id: user.id }).eq("id", claim.id);
     if (updateError) throw updateError;
     return NextResponse.json({ ok: true });

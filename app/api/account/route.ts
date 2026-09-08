@@ -80,7 +80,7 @@ export async function GET(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const user = await requireUser(req);
-    await enforceRateLimit(req, "delete-account", 3, 86_400);
+    await enforceRateLimit(req, `delete-account:${user.id}`, 3, 86_400);
     const body = await req.json();
     if (body.confirm !== "DELETE MY ACCOUNT") return NextResponse.json({ error: "Account deletion was not confirmed." }, { status: 400 });
     const db = supabaseAdmin();

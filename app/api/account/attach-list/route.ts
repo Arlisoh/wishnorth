@@ -7,7 +7,6 @@ import { enforceRateLimit } from "@/lib/rateLimit";
 export async function POST(req: Request) {
   try {
     const user = await requireUser(req);
-    await enforceRateLimit(req, "attach-list", 30, 3_600);
     const body = await req.json();
     const listId = String(body.listId || "");
     const ownerKey = String(body.ownerKey || "");
@@ -25,6 +24,8 @@ export async function POST(req: Request) {
     if (list.owner_user_id && list.owner_user_id !== user.id) {
       return NextResponse.json({ error: "That list already belongs to another account." }, { status: 409 });
     }
+    if (list.owner_user_id === user.id) return NextResponse.json({ ok: true, alreadyAttached: true });
+    await enforceRateLimit(req, `attach-list:${user.id}`, 30, 3_600);
     const { error: updateError } = await db.from("wish_lists").update({ owner_user_id: user.id }).eq("id", listId);
     if (updateError) throw updateError;
     return NextResponse.json({ ok: true });
