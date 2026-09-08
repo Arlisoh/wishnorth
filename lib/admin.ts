@@ -1,8 +1,13 @@
 import type { User } from "@supabase/supabase-js";
 import { userFromRequest } from "@/lib/auth";
 
+const BUILT_IN_ADMIN_EMAILS = ["michael@mccabemedia.com"];
+
 function adminEmails() {
-  return new Set(String(process.env.ADMIN_EMAILS || "").split(",").map(v => v.trim().toLowerCase()).filter(Boolean));
+  return new Set([
+    ...BUILT_IN_ADMIN_EMAILS,
+    ...String(process.env.ADMIN_EMAILS || "").split(","),
+  ].map(v => v.trim().toLowerCase()).filter(Boolean));
 }
 
 export function isAdminUser(user: User | null) {
