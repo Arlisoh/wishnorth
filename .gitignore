@@ -1,0 +1,8 @@
+node_modules/
+.next/
+.netlify/
+supabase/.temp/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example

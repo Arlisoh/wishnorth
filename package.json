@@ -1,6 +1,6 @@
 {
   "name": "wishnorth-mvp",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,12 +11,13 @@
     "@supabase/supabase-js": "^2.57.0",
     "cheerio": "^1.1.2",
     "next": "16.3.3",
+    "qrcode": "^1.5.4",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "qrcode": "^1.5.4"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@netlify/edge-functions": "^2.18.0",
+    "@netlify/functions": "6.0.0",
     "@types/node": "^22.18.0",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19.2.10",

@@ -24,8 +24,8 @@ export default function WishIndexPage() {
     </section>
     <section className="shell index-page-body"><TrendPanel full /></section>
     <section className="index-press shell">
-      <div><div className="eyebrow">PRESS & RETAIL DATA</div><h2>Need a local cut of the Index?</h2><p>As the sample grows, Wish North can report privacy-safe category, retailer, price and regional patterns for media coverage and retail planning.</p></div>
-      <a className="button button-dark button-big" href="https://metricnorth.ai" target="_blank" rel="noopener noreferrer">Contact Metric North →</a>
+      <div><div className="eyebrow">PRESS & RETAIL DATA</div><h2>Take the Index with you.</h2><p>Download the current product data, print the newsroom view, or contact Metric North for a privacy-safe category, retailer, price, or regional analysis.</p></div>
+      <div className="newsroom-actions"><a className="button button-ghost button-big" href="/api/trends?format=csv" download>Download CSV</a><a className="button button-dark button-big" href="https://metricnorth.ai" target="_blank" rel="noopener noreferrer">Contact Metric North →</a></div>
     </section>
     <Footer />
   </main>;

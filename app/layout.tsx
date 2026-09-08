@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./production.css";
+import "./index-v06.css";
 
 export const metadata: Metadata = {
   title: "Wish North | One list. Every store.",

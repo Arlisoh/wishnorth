@@ -1,6 +1,20 @@
-# Wish North v0.3 — Accounts + My Gifts + List Management
+# Wish North v0.6 — Wish Index Intelligence
 
 Wish North is the Metric North holiday wishlist MVP. v0.3 adds persistent adult accounts while preserving frictionless anonymous list creation and gift claiming.
+
+## Wish Index v0.6
+
+- Wish Velocity branded 0–100 demand and momentum score
+- Wish Share and seven-day share movement
+- Gift Gap and uncovered demand
+- Category, retailer, price, and signal filters
+- Retailer competitive intelligence view
+- Downloadable CSV and printable press view
+- Automatically generated This Week in Wishes newsroom panel
+- Private daily snapshots for historical and future year-over-year reporting
+- Daily Netlify scheduled function at 05:15 UTC
+
+Run the migration in `supabase/migrations/20260908150918_wish_index_history.sql` before deploying v0.6. The snapshot table is private and available only to the server service role.
 
 ## What works now
 
