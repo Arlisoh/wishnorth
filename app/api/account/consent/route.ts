@@ -6,13 +6,13 @@ import { supabaseAdmin } from "@/lib/supabase";
 export async function POST(req: Request) {
   try {
     const user = await requireUser(req);
-    await enforceRateLimit(req, "account-consent", 20, 3_600);
     const body = await req.json();
     if (!body.age18 || !body.termsAccepted) return NextResponse.json({ error: "You must be 18 or older and accept the Terms and Privacy Policy." }, { status: 400 });
     const db = supabaseAdmin();
     const { data: existing, error: existingError } = await db.from("account_consents").select("terms_version,privacy_version").eq("user_id", user.id).maybeSingle();
     if (existingError) throw existingError;
     if (existing?.terms_version === "2026-09-06" && existing?.privacy_version === "2026-09-06") return NextResponse.json({ ok: true });
+    await enforceRateLimit(req, `account-consent:${user.id}`, 5, 3_600);
     const now = new Date().toISOString();
     const { error } = await db.from("account_consents").upsert({
       user_id: user.id,
