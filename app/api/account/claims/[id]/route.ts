@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { enforceRateLimit } from "@/lib/rateLimit";
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireUser(req);
+    await enforceRateLimit(req, "release-claim", 60, 3_600);
     const { id } = await params;
     const db = supabaseAdmin();
     const { data: claim } = await db.from("gift_claims").select("id,claimer_user_id").eq("id", id).single();
@@ -14,7 +16,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     return NextResponse.json({ ok: true });
   } catch (e) {
     if (e instanceof Error && e.message === "UNAUTHORIZED") return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+    const status = (e as Error & { status?: number }).status || 500;
     console.error(e);
-    return NextResponse.json({ error: "Could not release that gift." }, { status: 500 });
+    return NextResponse.json({ error: status === 429 ? "Too many claim changes. Please try again later." : status === 503 ? "Gift claims are temporarily unavailable." : "Could not release that gift." }, { status });
   }
 }

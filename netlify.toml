@@ -8,6 +8,7 @@
 
 [images]
   remote_images = [
+    "^https://yhxwdiwrenpciomrspir\\.supabase\\.co/.*$",
     "^https://(www\\.)?cincyshirts\\.com/.*$",
     "^https://(www\\.)?flaviar\\.com/.*$"
   ]

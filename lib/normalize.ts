@@ -13,18 +13,46 @@ const STORE_NAMES: Record<string, string> = {
   "kohls.com": "Kohl's",
   "homedepot.com": "The Home Depot",
   "lowes.com": "Lowe's",
+  "cincyshirts.com": "Cincy Shirts",
+  "flaviar.com": "Flaviar",
+  "costco.com": "Costco",
+  "samsclub.com": "Sam's Club",
+  "wayfair.com": "Wayfair",
+  "sephora.com": "Sephora",
+  "ulta.com": "Ulta Beauty",
+  "apple.com": "Apple",
+  "lego.com": "LEGO",
 };
+
+const TRACKING_KEYS = new Set([
+  "gclid", "dclid", "fbclid", "msclkid", "gbraid", "wbraid", "yclid", "gad_source", "gad_campaignid",
+  "ref", "ref_", "tag", "affiliate", "affiliate_id", "affid", "irclickid", "campaignid", "source",
+]);
+
+function isTrackingKey(key: string) {
+  const lower = key.toLowerCase();
+  return TRACKING_KEYS.has(lower) || ["utm_", "nb_", "mc_", "pk_"].some(prefix => lower.startsWith(prefix));
+}
+
+function canonicalRetailerPath(url: URL) {
+  const host = url.hostname;
+  if (host === "amazon.com" || host.endsWith(".amazon.com")) {
+    const match = url.pathname.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})(?:[/?]|$)/i);
+    if (match) url.pathname = `/dp/${match[1].toUpperCase()}`;
+  }
+  url.pathname = url.pathname.replace(/\/{2,}/g, "/").replace(/\/$/, "") || "/";
+}
 
 export function normalizeProductUrl(value: string | null | undefined) {
   if (!value) return "";
   try {
     const u = new URL(value);
     u.hash = "";
-    const drop = ["utm_source","utm_medium","utm_campaign","utm_term","utm_content","gclid","fbclid","msclkid","ref","ref_","tag"];
-    drop.forEach(k => u.searchParams.delete(k));
-    [...u.searchParams.keys()].filter(k => k.toLowerCase().startsWith("utm_")).forEach(k => u.searchParams.delete(k));
+    [...u.searchParams.keys()].filter(isTrackingKey).forEach(k => u.searchParams.delete(k));
     u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
     if ((u.protocol === "https:" && u.port === "443") || (u.protocol === "http:" && u.port === "80")) u.port = "";
+    canonicalRetailerPath(u);
+    u.searchParams.sort();
     return u.toString().replace(/\?$/, "").replace(/\/$/, "");
   } catch { return ""; }
 }
@@ -36,7 +64,9 @@ export function normalizeTitle(value: string) {
 export function retailerDomain(url: string | null | undefined) {
   const host = hostFromUrl(url || "").toLowerCase();
   const parts = host.split(".");
-  return parts.length > 2 ? parts.slice(-2).join(".") : host;
+  const multipartSuffixes = new Set(["co.uk", "org.uk", "com.au", "com.br", "com.mx", "co.jp", "co.nz"]);
+  const suffix = parts.slice(-2).join(".");
+  return parts.length > 2 ? parts.slice(multipartSuffixes.has(suffix) ? -3 : -2).join(".") : host;
 }
 
 export function normalizeRetailer(input: string | null | undefined, url?: string | null) {

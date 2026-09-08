@@ -35,6 +35,14 @@ export default async function snapshotWishIndex(_req: Request, context: Context)
   }, { onConflict: "snapshot_date" });
 
   if (error) throw error;
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1_000).toISOString();
+  const [{ error: currentLimitCleanupError }, { error: legacyLimitCleanupError }] = await Promise.all([
+    db.from("api_rate_limits").delete().lt("updated_at", cutoff),
+    db.from("rate_limit_buckets").delete().lt("updated_at", cutoff),
+  ]);
+  if (currentLimitCleanupError || legacyLimitCleanupError) {
+    console.error("Rate-limit cleanup failed", currentLimitCleanupError || legacyLimitCleanupError);
+  }
   console.log(`Wish Index snapshot stored for ${snapshotDate}.`);
 }
 

@@ -7,6 +7,7 @@ import { supabaseBrowser } from "@/lib/supabase-browser";
 import { accessToken } from "@/lib/client-auth";
 import { syncLocalAccess } from "@/lib/client-sync";
 import { money } from "@/lib/helpers";
+import { productImageUrl } from "@/lib/productImage";
 
 type AccountData = {
   user: { id: string; email?: string; firstName?: string };
@@ -33,11 +34,29 @@ export default function AccountPage() {
     if (!token) { setAccount(null); return; }
     setLoadingAccount(true);
     try {
+      const consent = await fetch("/api/account/consent", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify({ age18: true, termsAccepted: true }),
+      });
+      if (!consent.ok) {
+        const consentData = await consent.json();
+        throw new Error(consentData.error || "Could not record account consent");
+      }
       await syncLocalAccess();
       const res = await fetch("/api/account", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not load account");
-      setAccount(data);
+      setAccount({
+        ...data,
+        claims: (data.claims || []).map((claim: AccountData["claims"][number]) => ({
+          ...claim,
+          item: {
+            ...claim.item,
+            image_url: claim.item.image_url ? productImageUrl(claim.item.image_url) : null,
+          },
+        })),
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load account");
     } finally {
@@ -160,6 +179,23 @@ function AccountDashboard({ data, onRefresh }: { data: AccountData; onRefresh: (
     }
   }
 
+  async function deleteAccount() {
+    if (!confirm("Permanently delete your Wish North account, every list you own, and every gift claim attached to it? This cannot be undone.")) return;
+    const token = await accessToken();
+    const res = await fetch("/api/account", {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ confirm: "DELETE MY ACCOUNT" }),
+    });
+    const result = await res.json();
+    if (!res.ok) { alert(result.error || "Could not delete your account."); return; }
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith("wishnorth_owner_") || key.startsWith("wishnorth_claim_")) localStorage.removeItem(key);
+    }
+    await supabaseBrowser().auth.signOut();
+    window.location.assign("/");
+  }
+
   return <div className="account-sections">
     <section className="account-section"><div className="account-section-head"><div><div className="eyebrow">MY LISTS</div><h2>Your wish lists</h2></div><Link href="/new" className="button button-primary">+ New list</Link></div>
       {data.lists.length ? <div className="my-lists-grid">{data.lists.map(list => <Link href={`/list/${list.id}`} className="my-list-card" key={list.id}><div><div className="eyebrow">{list.occasion.toUpperCase()}</div><h2>{list.subject_name}’s list</h2><p>{list.itemCount} {list.itemCount === 1 ? "wish" : "wishes"}</p></div><span>Manage →</span></Link>)}</div> : <div className="mini-empty">No lists yet. <Link href="/new">Start your first list →</Link></div>}
@@ -167,5 +203,6 @@ function AccountDashboard({ data, onRefresh }: { data: AccountData; onRefresh: (
     <section className="account-section"><div className="account-section-head"><div><div className="eyebrow">MY GIFTS</div><h2>Gifts you’re buying</h2></div><Link href="/my-gifts" className="button button-ghost">Open My Gifts</Link></div>
       {data.claims.length ? <div className="claim-list">{data.claims.slice(0, 4).map(claim => <div className="claim-card" key={claim.id}>{claim.item.image_url ? <img src={claim.item.image_url} alt="" /> : <div className="claim-thumb">🎁</div>}<div className="claim-main"><div className="eyebrow">FOR {claim.list.subject_name.toUpperCase()}</div><strong>{claim.item.title}</strong><span>{claim.item.retailer || "Wish"}{claim.item.price_cents != null ? ` · ${money(claim.item.price_cents, claim.item.currency)}` : ""}</span></div><div className="claim-actions">{claim.item.url ? <a href={claim.item.url} target="_blank" rel="noreferrer" className="text-link">Buy ↗</a> : null}<button className="plain-link danger-link" onClick={() => releaseClaim(claim.id, claim.item.title)}>Release</button></div></div>)}</div> : <div className="mini-empty">Nothing claimed yet. When you claim a gift from someone’s list, it will appear here.</div>}
     </section>
+    <section className="account-danger"><div><strong>Delete account and data</strong><p>Permanently removes your account, lists, wishes, and attached gift claims.</p></div><button className="button button-ghost danger-link" onClick={deleteAccount}>Delete my account</button></section>
   </div>;
 }

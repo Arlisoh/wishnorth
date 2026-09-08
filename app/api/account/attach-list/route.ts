@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { hashKey } from "@/lib/security";
+import { enforceRateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
   try {
     const user = await requireUser(req);
+    await enforceRateLimit(req, "attach-list", 30, 3_600);
     const body = await req.json();
     const listId = String(body.listId || "");
     const ownerKey = String(body.ownerKey || "");
@@ -28,7 +30,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   } catch (e) {
     if (e instanceof Error && e.message === "UNAUTHORIZED") return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+    const status = (e as Error & { status?: number }).status || 500;
     console.error(e);
-    return NextResponse.json({ error: "Could not save that list to your account." }, { status: 500 });
+    return NextResponse.json({ error: status === 429 ? "Too many list attachments. Please try again later." : status === 503 ? "Account saving is temporarily unavailable." : "Could not save that list to your account." }, { status });
   }
 }
