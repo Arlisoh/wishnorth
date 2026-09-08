@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
 import { supabaseBrowser } from "@/lib/supabase-browser";
@@ -28,10 +28,14 @@ export default function AccountPage() {
   const [loadingAccount, setLoadingAccount] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const accountLoadInFlight = useRef(false);
 
   const loadAccount = useCallback(async () => {
+    if (accountLoadInFlight.current) return;
+    accountLoadInFlight.current = true;
     const token = await accessToken();
-    if (!token) { setAccount(null); return; }
+    if (!token) { setAccount(null); accountLoadInFlight.current = false; return; }
+    setError("");
     setLoadingAccount(true);
     try {
       const consent = await fetch("/api/account/consent", {
@@ -61,6 +65,7 @@ export default function AccountPage() {
       setError(e instanceof Error ? e.message : "Could not load account");
     } finally {
       setLoadingAccount(false);
+      accountLoadInFlight.current = false;
     }
   }, []);
 
