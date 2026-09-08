@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     if (!body.adultConfirmed) return NextResponse.json({ error: "Adult confirmation is required." }, { status: 400 });
     if (!/^\S+@\S+\.\S+$/.test(email) || password.length < 8) return NextResponse.json({ error: "Enter a valid email and a password of at least 8 characters." }, { status: 400 });
 
-    const origin = new URL(req.url).origin;
+    const origin = process.env.NEXT_PUBLIC_SITE_URL || "https://wishnorth.netlify.app";
     const admin = supabaseAdmin();
     const { data, error } = await admin.auth.admin.generateLink({
       type: "signup",
