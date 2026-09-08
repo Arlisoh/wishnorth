@@ -120,23 +120,23 @@ function AuthPanel({ mode, setMode, notice, setNotice, error, setError }: {
     const supabase = supabaseBrowser();
     try {
       if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            data: { first_name: firstName.trim() },
-            emailRedirectTo: `${window.location.origin}/account`,
-          },
+        const response = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email: email.trim(), password, firstName: firstName.trim(), adultConfirmed: localStorage.getItem("wishnorth_adult_account_confirmed") === "yes" }),
         });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Could not create account.");
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;
-        if (!data.session) setNotice("Check your email to confirm your Wish North account. Your lists and claims on this browser will be waiting when you sign in.");
-        else setNotice("Account created. Saving your lists and claims now…");
+        setNotice("Account created. Saving your lists and claims now…");
       } else if (mode === "signin") {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;
       } else {
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/account/reset` });
-        if (error) throw error;
+        const response = await fetch("/api/auth/password-reset", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: email.trim() }) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Could not send reset email.");
         setNotice("If an account exists for that email, a password reset link is on its way. If it does not arrive, check spam or create an account first.");
       }
     } catch (e) {
