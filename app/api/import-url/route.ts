@@ -16,6 +16,15 @@ function manualWarning(retailer: string | null) {
   return `${store} did not share its product details automatically. Your link is saved. Add the item name and any details you want below.`;
 }
 
+function isUsefulProductTitle(title: string, retailer: string | null) {
+  const normalized = title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (!normalized || normalized.length < 3) return false;
+  const generic = new Set(["amazon", "amazon com", "stubhub", "stubhub com", "robot check"]);
+  if (generic.has(normalized)) return false;
+  if (retailer && normalized === retailer.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()) return false;
+  return true;
+}
+
 export async function POST(req: Request) {
   let safeUrl: URL | null = null;
   try {
@@ -65,9 +74,11 @@ export async function POST(req: Request) {
       if (imageUrl) { try { imageUrl = new URL(imageUrl, finalUrl).toString(); } catch { imageUrl = ""; } }
       const cached = await cacheProductImage(imageUrl);
       const canonical = normalizeProductUrl(finalUrl.toString()) || canonicalInput;
-      const cleanTitle = title.trim().replace(/\s+/g, " ").slice(0, 300);
       const store = normalizeRetailer(retailer, canonical) || inputRetailer;
-      return NextResponse.json({ title:cleanTitle,imageUrl:cached.imageUrl,imageSourceUrl:cached.sourceUrl,price:cleanPrice(price),retailer:store,retailerDomain:retailerDomain(canonical),finalUrl:canonical,normalizedTitle:normalizeTitle(cleanTitle),productKey:productKey(cleanTitle,canonical),warning:cleanTitle?null:manualWarning(store) });
+      const scrapedTitle = title.trim().replace(/\s+/g, " ").slice(0, 300);
+      const cleanTitle = isUsefulProductTitle(scrapedTitle, store) ? scrapedTitle : "";
+      const partial = !cleanTitle;
+      return NextResponse.json({ title:cleanTitle,imageUrl:partial?null:cached.imageUrl,imageSourceUrl:partial?null:cached.sourceUrl,price:partial?"":cleanPrice(price),retailer:store,retailerDomain:retailerDomain(canonical),finalUrl:canonical,normalizedTitle:normalizeTitle(cleanTitle),productKey:productKey(cleanTitle,canonical),warning:partial?manualWarning(store):null,partial });
     } catch {
       return NextResponse.json({ title:"",imageUrl:null,imageSourceUrl:null,price:"",retailer:inputRetailer,finalUrl:canonicalInput,warning:manualWarning(inputRetailer),partial:true });
     }
