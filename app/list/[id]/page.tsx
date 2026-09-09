@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, use, useEffect, useState } from "react";
+import { FormEvent, use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
 import { authHeaders } from "@/lib/client-auth";
@@ -8,6 +8,51 @@ import { supabaseBrowser } from "@/lib/supabase-browser";
 import Header from "@/components/Header";
 import ItemCard from "@/components/ItemCard";
 import type { WishItem, WishList } from "@/lib/types";
+
+function normalizePastedUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  const embedded = trimmed.match(/https?:\/\/[^\s]+/i)?.[0];
+  const raw = (embedded || trimmed).replace(/[),.;]+$/, "");
+  const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+    return parsed.toString();
+  } catch {
+    return "";
+  }
+}
+
+function friendlyClientError(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message.trim() : "";
+  if (!message) return fallback;
+
+  const lower = message.toLowerCase();
+  const technicalMessages = [
+    "expected pattern",
+    "failed to fetch",
+    "load failed",
+    "networkerror",
+    "network request failed",
+    "unexpected end of json",
+    "json parse",
+    "could not add that wish",
+    "could not save wish",
+  ];
+
+  return technicalMessages.some(part => lower.includes(part)) ? fallback : message;
+}
+
+async function responseJson(res: Response) {
+  try {
+    return await res.json();
+  } catch {
+    return {};
+  }
+}
 
 export default function OwnerList({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -22,7 +67,7 @@ export default function OwnerList({ params }: { params: Promise<{ id: string }> 
   async function load(key: string) {
     const headers = await authHeaders(key ? { "x-owner-key": key } : {});
     const res = await fetch(`/api/lists/${id}`, { headers, cache: "no-store" });
-    const data = await res.json();
+    const data = await responseJson(res);
     if (!res.ok) throw new Error(data.error || "Could not load list");
     setList(data.list);
   }
@@ -36,15 +81,20 @@ export default function OwnerList({ params }: { params: Promise<{ id: string }> 
       const { data } = supabase.auth.onAuthStateChange((_e, session) => setSignedIn(Boolean(session)));
       load(key).catch(e => setError(e.message)).finally(() => setLoading(false));
       return () => data.subscription.unsubscribe();
-    } catch { load(key).catch(e => setError(e.message)).finally(() => setLoading(false)); }
+    } catch {
+      load(key).catch(e => setError(e.message)).finally(() => setLoading(false));
+    }
   }, [id]);
 
   async function deleteItem(itemId: string, title: string) {
     if (!confirm(`Delete “${title}” from this list?`)) return;
     const headers = await authHeaders(ownerKey ? { "x-owner-key": ownerKey } : {});
     const res = await fetch(`/api/lists/${id}/items/${itemId}`, { method: "DELETE", headers });
-    const data = await res.json();
-    if (!res.ok) { setError(data.error || "Could not delete wish"); return; }
+    const data = await responseJson(res);
+    if (!res.ok) {
+      setError(data.error || "Could not delete wish");
+      return;
+    }
     await load(ownerKey);
   }
 
@@ -59,11 +109,110 @@ export default function OwnerList({ params }: { params: Promise<{ id: string }> 
   </section></main>;
 }
 
-function WishModal({listId,ownerKey,item,onClose,onSaved}:{listId:string;ownerKey:string;item:WishItem|null;onClose:()=>void;onSaved:()=>void}){
-  const[url,setUrl]=useState(item?.url||"");const[title,setTitle]=useState(item?.title||"");const[retailer,setRetailer]=useState(item?.retailer||"");const[imageUrl,setImageUrl]=useState(item?.image_url||"");const[imageSourceUrl,setImageSourceUrl]=useState(item?.image_source_url||"");const[price,setPrice]=useState(item?.price_cents!=null?(item.price_cents/100).toFixed(2):"");const[size,setSize]=useState(item?.size||"");const[color,setColor]=useState(item?.color||"");const[notes,setNotes]=useState(item?.notes||"");const[priority,setPriority]=useState(item?.priority||2);const[website,setWebsite]=useState("");const[working,setWorking]=useState(false);const[importError,setImportError]=useState("");const[importNotice,setImportNotice]=useState("");const[saveError,setSaveError]=useState("");
-  async function importUrl(){if(!url)return;setWorking(true);setImportError("");setImportNotice("");try{const res=await fetch("/api/import-url",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({url,website})});const data=await res.json();if(!res.ok)throw new Error(data.error||"Could not read that page");setUrl(data.finalUrl||url);setTitle(data.title||title);setRetailer(data.retailer||retailer);setImageUrl(data.imageUrl||"");setImageSourceUrl(data.imageSourceUrl||"");setPrice(data.price||price);if(data.warning)setImportNotice(data.warning);}catch(e){setImportError(e instanceof Error?e.message:"Could not import");}finally{setWorking(false);}}
-  async function save(e:FormEvent){e.preventDefault();setWorking(true);setSaveError("");try{const headers=await authHeaders({"content-type":"application/json",...(ownerKey?{"x-owner-key":ownerKey}:{})});const path=item?`/api/lists/${listId}/items/${item.id}`:`/api/lists/${listId}/items`;const res=await fetch(path,{method:item?"PATCH":"POST",headers,body:JSON.stringify({url,title,retailer,imageUrl,imageSourceUrl,price,size,color,notes,priority,website})});const data=await res.json();if(!res.ok)throw new Error(data.error||"Could not save wish");onSaved();}catch(e){setSaveError(e instanceof Error?e.message:"Could not save wish");setWorking(false);}}
-  return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}><div className="modal"><button className="modal-x" onClick={onClose}>×</button><div className="eyebrow">{item?"EDIT WISH":"ADD A WISH"}</div><h2>{item?"Change the details.":"Paste it. We’ll do the boring part."}</h2><div className="url-import"><input value={url} onChange={e=>{setUrl(e.target.value);setImportError("");setImportNotice("");}} placeholder="https://store.com/product…"/><button type="button" className="button button-dark" onClick={importUrl} disabled={working}>{working?"Reading…":"Import"}</button></div><div className="import-feedback" aria-live="polite">{importError?<div className="error-box">{importError}</div>:null}{importNotice?<div className="import-notice"><strong>Link saved.</strong><span>{importNotice}</span></div>:null}</div><form onSubmit={save} className="compact-form"><label><span>Item name *</span><input required value={title} onChange={e=>setTitle(e.target.value)}/></label><div className="two-col"><label><span>Store</span><input value={retailer} onChange={e=>setRetailer(e.target.value)}/></label><label><span>Price</span><input value={price} onChange={e=>setPrice(e.target.value)} inputMode="decimal"/></label></div><label><span>Image URL</span><input value={imageUrl} onChange={e=>setImageUrl(e.target.value)}/></label><div className="two-col"><label><span>Size</span><input value={size} onChange={e=>setSize(e.target.value)}/></label><label><span>Color</span><input value={color} onChange={e=>setColor(e.target.value)}/></label></div><label><span>Notes</span><textarea rows={2} value={notes} onChange={e=>setNotes(e.target.value)}/></label><label><span>How much do you want it?</span><div className="priority-buttons">{[1,2,3].map(n=><button type="button" key={n} className={priority===n?"selected":""} onClick={()=>setPriority(n)}>{"♥".repeat(n)}</button>)}</div></label><label className="honeypot" aria-hidden="true"><span>Website</span><input tabIndex={-1} value={website} onChange={e=>setWebsite(e.target.value)}/></label>{saveError?<div className="error-box">{saveError}</div>:null}<button className="button button-primary button-big full" disabled={working}>{working?"Saving…":item?"Save changes →":"Add to list →"}</button></form></div></div>;
+function WishModal({listId,ownerKey,item,onClose,onSaved}:{listId:string;ownerKey:string;item:WishItem|null;onClose:()=>void;onSaved:()=>void|Promise<void>}){
+  const [url,setUrl]=useState(item?.url||"");
+  const [title,setTitle]=useState(item?.title||"");
+  const [retailer,setRetailer]=useState(item?.retailer||"");
+  const [imageUrl,setImageUrl]=useState(item?.image_url||"");
+  const [imageSourceUrl,setImageSourceUrl]=useState(item?.image_source_url||"");
+  const [price,setPrice]=useState(item?.price_cents!=null?(item.price_cents/100).toFixed(2):"");
+  const [size,setSize]=useState(item?.size||"");
+  const [color,setColor]=useState(item?.color||"");
+  const [notes,setNotes]=useState(item?.notes||"");
+  const [priority,setPriority]=useState(item?.priority||2);
+  const [website,setWebsite]=useState("");
+  const [working,setWorking]=useState(false);
+  const [importError,setImportError]=useState("");
+  const [importNotice,setImportNotice]=useState("");
+  const [saveError,setSaveError]=useState("");
+  const feedbackRef=useRef<HTMLDivElement>(null);
+
+  function revealFeedback(){
+    requestAnimationFrame(()=>feedbackRef.current?.scrollIntoView({behavior:"smooth",block:"center"}));
+  }
+
+  async function importUrl(){
+    if(!url.trim())return;
+    setWorking(true);
+    setImportError("");
+    setImportNotice("");
+    setSaveError("");
+
+    const cleanUrl=normalizePastedUrl(url);
+    if(!cleanUrl){
+      setImportError("Paste a complete product link, such as https://amazon.com/…");
+      setWorking(false);
+      revealFeedback();
+      return;
+    }
+
+    setUrl(cleanUrl);
+
+    try{
+      const res=await fetch("/api/import-url",{
+        method:"POST",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({url:cleanUrl,website}),
+      });
+      const data=await responseJson(res);
+      if(!res.ok)throw new Error(data.error||"Could not read that page");
+
+      const finalUrl=normalizePastedUrl(String(data.finalUrl||cleanUrl))||cleanUrl;
+      setUrl(finalUrl);
+      if(typeof data.title==="string"&&data.title.trim())setTitle(data.title);
+      if(typeof data.retailer==="string"&&data.retailer.trim())setRetailer(data.retailer);
+      if(typeof data.imageUrl==="string"&&data.imageUrl.trim())setImageUrl(data.imageUrl);
+      if(typeof data.imageSourceUrl==="string"&&data.imageSourceUrl.trim())setImageSourceUrl(data.imageSourceUrl);
+      if(typeof data.price==="string"&&data.price.trim())setPrice(data.price);
+
+      if(data.warning){
+        setImportNotice(String(data.warning));
+        revealFeedback();
+      }else if(!data.imageUrl){
+        setImportNotice("We found the product details, but the store did not give us a usable image. You can still save the wish.");
+        revealFeedback();
+      }
+    }catch(e){
+      setImportError(friendlyClientError(e,"We couldn’t read that product page automatically. Your link and anything already filled in are still here, so you can complete the missing details and save the wish."));
+      revealFeedback();
+    }finally{
+      setWorking(false);
+    }
+  }
+
+  async function save(e:FormEvent){
+    e.preventDefault();
+    setWorking(true);
+    setSaveError("");
+    setImportError("");
+
+    const cleanUrl=url.trim()?normalizePastedUrl(url):"";
+    if(url.trim()&&!cleanUrl){
+      setSaveError("That product link doesn’t look complete. Fix the link, or clear it if you want to save this wish manually.");
+      setWorking(false);
+      revealFeedback();
+      return;
+    }
+
+    try{
+      const headers=await authHeaders({"content-type":"application/json",...(ownerKey?{"x-owner-key":ownerKey}:{})});
+      const path=item?`/api/lists/${listId}/items/${item.id}`:`/api/lists/${listId}/items`;
+      const res=await fetch(path,{
+        method:item?"PATCH":"POST",
+        headers,
+        body:JSON.stringify({url:cleanUrl,title,retailer,imageUrl,imageSourceUrl,price,size,color,notes,priority,website}),
+      });
+      const data=await responseJson(res);
+      if(!res.ok)throw new Error(data.error||"Could not save wish");
+      await onSaved();
+    }catch(e){
+      setSaveError(friendlyClientError(e,"We couldn’t save this wish right now. Your details are still here. Please try again."));
+      setWorking(false);
+      revealFeedback();
+    }
+  }
+
+  return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}><div className="modal"><button className="modal-x" onClick={onClose}>×</button><div className="eyebrow">{item?"EDIT WISH":"ADD A WISH"}</div><h2>{item?"Change the details.":"Paste it. We’ll do the boring part."}</h2><div className="url-import"><input value={url} onChange={e=>{setUrl(e.target.value);setImportError("");setImportNotice("");setSaveError("");}} placeholder="https://store.com/product…"/><button type="button" className="button button-dark" onClick={importUrl} disabled={working}>{working?"Reading…":"Import"}</button></div><div className="import-feedback" aria-live="polite" ref={feedbackRef}>{importError?<div className="error-box">{importError}</div>:null}{saveError?<div className="error-box">{saveError}</div>:null}{importNotice?<div className="import-notice"><strong>Link saved.</strong><span>{importNotice}</span></div>:null}</div><form onSubmit={save} className="compact-form"><label><span>Item name *</span><input required value={title} onChange={e=>setTitle(e.target.value)}/></label><div className="two-col"><label><span>Store</span><input value={retailer} onChange={e=>setRetailer(e.target.value)}/></label><label><span>Price</span><input value={price} onChange={e=>setPrice(e.target.value)} inputMode="decimal"/></label></div><label><span>Image URL</span><input value={imageUrl} onChange={e=>setImageUrl(e.target.value)}/></label><div className="two-col"><label><span>Size</span><input value={size} onChange={e=>setSize(e.target.value)}/></label><label><span>Color</span><input value={color} onChange={e=>setColor(e.target.value)}/></label></div><label><span>Notes</span><textarea rows={2} value={notes} onChange={e=>setNotes(e.target.value)}/></label><label><span>How much do you want it?</span><div className="priority-buttons">{[1,2,3].map(n=><button type="button" key={n} className={priority===n?"selected":""} onClick={()=>setPriority(n)}>{"♥".repeat(n)}</button>)}</div></label><label className="honeypot" aria-hidden="true"><span>Website</span><input tabIndex={-1} value={website} onChange={e=>setWebsite(e.target.value)}/></label><button className="button button-primary button-big full" disabled={working}>{working?"Saving…":item?"Save changes →":"Add to list →"}</button></form></div></div>;
 }
 
 function ShareModal({list,onClose}:{list:WishList;onClose:()=>void}){
