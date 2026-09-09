@@ -14,7 +14,12 @@ function isPrivateIpv6(ip: string) {
 }
 
 export async function assertPublicHttpUrl(raw: string) {
-  const url = new URL(raw);
+  const trimmed = String(raw || "").trim();
+  const sharedUrl = trimmed.match(/https?:\/\/[^\s<>"']+/i)?.[0];
+  let candidate = (sharedUrl || trimmed).replace(/[\])},.;!?]+$/, "");
+  if (/^www\./i.test(candidate)) candidate = `https://${candidate}`;
+  if (!/^https?:\/\//i.test(candidate) && /^[a-z0-9.-]+\.[a-z]{2,}(?:\/|$)/i.test(candidate)) candidate = `https://${candidate}`;
+  const url = new URL(candidate);
   if (!["http:", "https:"].includes(url.protocol)) throw new Error("Only public HTTP(S) URLs are allowed");
   if (url.username || url.password) throw new Error("URLs with embedded credentials are not allowed");
   const host = url.hostname.toLowerCase();
