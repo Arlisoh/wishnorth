@@ -54,6 +54,14 @@ export async function POST(req: Request) {
           }
         } catch {}
       });
+      if (!imageUrl) {
+        const dynamicImages = $("#landingImage").attr("data-a-dynamic-image") || $("#imgBlkFront").attr("data-a-dynamic-image");
+        if (dynamicImages) {
+          try { imageUrl = Object.keys(JSON.parse(dynamicImages))[0] || ""; } catch {}
+        }
+      }
+      imageUrl = imageUrl || $("#landingImage").attr("data-old-hires") || $("#landingImage").attr("src") || $("#imgBlkFront").attr("src") || $("main img").first().attr("src") || "";
+      price = price || $(".a-price .a-offscreen").first().text() || $("#priceblock_ourprice").text() || $("#priceblock_dealprice").text() || "";
       if (imageUrl) { try { imageUrl = new URL(imageUrl, finalUrl).toString(); } catch { imageUrl = ""; } }
       const cached = await cacheProductImage(imageUrl);
       const canonical = normalizeProductUrl(finalUrl.toString()) || canonicalInput;
