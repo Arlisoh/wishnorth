@@ -34,9 +34,19 @@ function headerObject(extra: HeadersInit) {
 }
 
 export async function authHeaders(extra: HeadersInit = {}) {
+  const headers = headerObject(extra);
+  const hasOwnerKey = Object.entries(headers).some(
+    ([key, value]) => key.toLowerCase() === "x-owner-key" && Boolean(value),
+  );
+
+  // Owner-key requests are already authorized by the list's secret key.
+  // Avoid touching the Supabase browser session on this path, which also
+  // keeps list ownership actions resilient on mobile Safari.
+  if (hasOwnerKey) return headers;
+
   const token = await accessToken();
   return {
-    ...headerObject(extra),
+    ...headers,
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
